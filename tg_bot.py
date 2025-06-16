@@ -3,7 +3,9 @@ import os
 import json
 import random
 import requests
-import time
+import csv
+from datetime import datetime
+from pathlib import Path
 from telegram import Update
 from telegram.ext import Updater, MessageHandler, Filters, CommandHandler
 
@@ -12,6 +14,8 @@ YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
+
+SUBSCRIBERS_FILE = "subscribers.csv"
 
 BOT_DESCRIPTION = """
 🔮 *Рунический ПсихоБот* 
@@ -31,6 +35,15 @@ BOT_DESCRIPTION = """
 • Какие ресурсы мне сейчас нужны?
 """
 
+
+def save_subscriber(user_id: int):
+    file_exists = Path(SUBSCRIBERS_FILE).exists()
+
+    with open(SUBSCRIBERS_FILE, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["user_id", "first_seen"])
+        writer.writerow([user_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
 
 def send_intro(chat_id, bot):
     bot.send_message(
@@ -103,6 +116,11 @@ def ask_gpt(user_question: str, rune_name: str):
 
 
 def handle_message(update: Update, context):
+    if not context.user_data.get('is_subscribed'):
+        user = update.message.from_user
+        save_subscriber(user.id)
+        context.user_data['is_subscribed'] = True
+
     user_question = update.message.text
     rune_name, rune_image = get_random_rune()
 
