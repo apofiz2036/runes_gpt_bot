@@ -1,15 +1,85 @@
 from dotenv import load_dotenv
 import os
+import json
+import random
 import requests
-from telegram.ext import Updater, MessageHandler, Filters
+import time
+from telegram import Update
+from telegram.ext import Updater, MessageHandler, Filters, CommandHandler
 
 load_dotenv()
-
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ADMIN_ID = os.getenv("ADMIN_ID")
 
-def ask_gpt(text):
+BOT_DESCRIPTION = """
+🔮 *Рунический ПсихоБот* 
+
+Я помогаю взглянуть на ситуацию через призму скандинавских рун, используя их как ассоциативные карты. 
+
+*Как это работает:*
+1. Задаёте вопрос или описываете ситуацию
+2. Я "вытягиваю" случайную руну
+3. Даю психологическую интерпретацию символа
+
+Нет мистики — только работа с образами и подсознанием!
+
+Примеры вопросов:
+• Почему я чувствую тревогу?
+• Как улучшить отношения с коллегой?
+• Какие ресурсы мне сейчас нужны?
+"""
+
+
+def send_intro(chat_id, bot):
+    bot.send_message(
+        chat_id=chat_id,
+        text=BOT_DESCRIPTION,
+        parse_mode="Markdown"
+    )
+
+
+def start(update: Update, context):
+    send_intro(update.message.chat_id, context.bot)
+
+
+def help_command(update: Update, context):
+    send_intro(update.message.chat_id, context.bot)
+
+
+def load_rune_data():
+    with open('runes.json', 'r', encoding='utf-8') as file:
+        data = json.load(file)
+        return data['one_rune']
+    
+
+def get_random_rune():
+    rune_data = load_rune_data()
+    all_runes = list(rune_data.keys())
+    random_rune = random.choice(all_runes)
+
+    single_runes = ["dagaz", "eihwaz", "gebo", "hagalaz", "inguz", "isa", "jera", "sowilo"]
+
+    if random_rune in single_runes:
+        name = rune_data[random_rune]['name']
+        image = rune_data[random_rune]['image']
+    else:
+        variant = random.choice(list(rune_data[random_rune].keys()))
+        name = rune_data[random_rune][variant]['name']
+        image = rune_data[random_rune][variant]['image']
+
+    image_path = os.path.join('images', image)
+    return name, image_path
+
+def load_prompt():
+    with open('prompt.txt', 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def ask_gpt(user_question: str, rune_name: str):
+    prompt = load_prompt().format(question=user_question, rune=rune_name)
+
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {
         "Content-Type": "application/json",
@@ -19,32 +89,46 @@ def ask_gpt(text):
     data = {
         "modelUri": f"gpt://{YANDEX_FOLDER_ID}/yandexgpt-lite",
         "messages": [
-            {"role": "system", "text": "Ты — оракул рун. Отвечай мистически, 1-2 предложениями."},
-            {"role": "user", "text": text},
+            {"role": "system", "text": "Ты психолог, использующий скандинавские руны как ассоциативные карты. Даёшь рациональные интерпретации, основанные на символизме рун и современной психологии. Избегай мистики и предсказаний."},
+            {"role": "user", "text": prompt},
         ],
     }
     
     try:
         response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()  # Проверяем HTTP-ошибки
-        result = response.json()
-        
-        if "result" not in result:
-            print("Ошибка в ответе API:", result)  # Логируем неправильный ответ
-            return "Произошла ошибка. Попробуй ещё раз позже."
-            
-        return result["result"]["alternatives"][0]["message"]["text"]
-        
+        response.raise_for_status()
+        return response.json()["result"]["alternatives"][0]["message"]["text"]
     except Exception as e:
-        print("Ошибка при запросе к YandexGPT:", e)
-        return "Я не смог погадать. Попробуй ещё раз."
+        return "Упс, произошла ошибка"
 
-def handle_message(update, context):
-    reply = ask_gpt(update.message.text)
-    update.message.reply_text(reply)
 
-updater = Updater(TELEGRAM_TOKEN)
-updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
-updater.start_polling()
-print("Бот запущен!")
-updater.idle()
+def handle_message(update: Update, context):
+    user_question = update.message.text
+    rune_name, rune_image = get_random_rune()
+
+    with open(rune_image, 'rb') as photo:
+        update.message.reply_photo(photo)
+
+    gpt_response = ask_gpt(user_question, rune_name)
+    update.message.reply_text(gpt_response)
+
+
+def main():
+    updater = Updater(TELEGRAM_TOKEN)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help_command))
+    dp.add_handler(MessageHandler(Filters.text, handle_message))
+
+    updater.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=' 🔮 Бот запущен и готов к работе!'
+    )
+
+    updater.start_polling()
+    updater.idle()
+
+
+if __name__ == '__main__':
+    main()

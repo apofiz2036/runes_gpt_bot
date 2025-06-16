@@ -1,0 +1,195 @@
+{"one_rune": {
+    "ansuz":{
+        "ansuz_direct":{
+            "name": "Ансуз в прямом положении",
+            "image": "ansuz.png"         
+        },
+        "ansuz_revers":{
+            "name": "Ансуз в перевёрнутом положении",
+            "image": "ansuz-revers.png" 
+        }
+    },
+    "berkana":{
+        "berkana_direct":{
+            "name": "Беркана в прямом положении",
+            "image": "berkana.png" 
+        },
+        "berkana_revers":{
+            "name": "Беркана в перевёрнутом положении",
+            "image": "berkana-revers.png" 
+        }
+    },
+    "dagaz":{
+        "name": "Дагаз",
+        "image":"dagaz.png"
+    },
+    "ehwaz":{
+        "ehwaz_direct":{
+            "name": "Эваз в прямом положении",
+             "image":"ehwaz.png"
+        },
+        "ehwaz_revers":{
+            "name": "Эваз в перевёрнутом положении",
+            "image":"ehwaz-revers.png"
+        }
+    },
+    "eihwaz":{
+        "name": "Эйваз",
+        "image": "eihwaz.png"
+    },
+    "elhaz":{
+        "elhaz_direct":{
+            "name": "Альгиз в прямом положении",
+            "image":"elhaz.png"
+        },
+        "elhaz_revers":{
+            "name": "Альгиз в перевёрнутом положении",
+            "image":"elhaz-revers.png"
+        }
+    },
+
+    "fehu":{
+        "fehu_direct":{
+            "name": "Феху в прямом положении",
+            "image": "fehu.png"
+        },
+        "fehu_revers":{
+            "name": "Феху в перевёрнутом положении",
+            "image":"fehu-revers.png"
+        }
+    },
+    "gebo":{
+        "name": "Гебо",
+         "image":"gebo.png"
+    },
+    "hagalaz":{
+        "name": "Хагалаз",
+        "image":"hagalaz.png"
+    },
+    "inguz":{
+        "name": "Ингуз",
+        "image":"inguz.png"
+    },
+    "isa":{
+        "name": "Иса",
+        "image":"isa.png"
+    },
+    "jera":{
+        "name": "Йер",
+        "image":"jera.png"
+    },
+    "kenaz":{
+        "kenaz_direct":{
+            "name": "Кано в прямом положении",
+            "image":"kenaz.png"
+        },
+        "kenaz_revers":{
+            "name": "Кано в перевёрнутом положении",
+            "image":"kenaz-revers.png"
+        }
+    },
+    "laguz":{
+        "laguz_direct":{
+            "name": "Лагуз в прямом положении",
+            "image":"laguz.png"
+        },
+        "laguz_revers":{
+            "name": "Лагуз в перевёрнутом положении",
+            "image":"laguz-revers.png"
+        }
+    },
+    "mannaz":{
+        "mannaz_direct":{
+            "name": "Манназ в прямом положении",
+            "image":"mannaz.png"
+        },
+        "mannaz_revers":{
+            "name": "Манназ в перевёрнутом положении",
+            "image":"mannaz_revers.png"
+        }
+    },
+    "nauthiz":{
+        "nauthiz_direct":{
+            "name": "Наутиз в прямом положении",
+            "image":"nauthiz.png"
+        },
+        "nauthiz_revers":{
+            "name": "Наутиз в перевёрнутом положении",
+            "image":"nauthiz-revers.png"
+        }
+    },
+    "othala":{
+        "othala_direct":{
+            "name": "Отал в прямом положении",
+            "image":"othala.png"
+        },
+        "othala_revers":{
+            "name": "Отал в перевёрнутом положении",
+            "image": "othala-revers.png"
+        }
+    },
+    "perthro":{
+        "perthro_direct":{
+            "name": "Перт в прямом положении",
+            "image":"perthro.png"
+        },
+        "perthro_revers":{
+            "name": "Перт в перевёрнутом положении",
+            "image":"perthro-revers.png"
+        }
+    },
+    "raidho":{
+        "raidho_direct":{
+            "name": "Раидо в прямом положении",
+            "image":"raidho.png"
+        },
+        "raidho_revers":{
+            "name": "Раидо в перевёрнутом положении",
+            "image":"raidho-revers.png"
+        }
+    },
+    "sowilo":{
+        "name": "Соул",
+        "image":"sowilo.png"
+    },
+    "thurisaz":{
+        "thurisaz_direct":{
+            "name": "Турисаз в прямом положении",
+            "image":"thurisaz.png"
+        },
+        "thurisaz_revers":{
+            "name": "Турисаз в перевёрнутом положении",
+            "image":"thurisaz-revers.png"
+        }
+    },
+    "tiewaz":{
+        "tiewaz_direct":{
+            "name": "Теиваз в прямом положении",
+            "image":"tiewaz.png"
+        },
+        "tiewaz_revers":{
+            "name": "Теиваз в перевёрнутом положении",
+            "image":"tiewaz-revers.png"
+        }
+    },
+    "uruz":{
+        "uruz_direct":{
+            "name": "Уруз в прямом положении",
+            "image":"uruz.png"
+        },
+        "uruz_revers":{
+            "name": "Уруз в перевёрнутом положении",
+            "image":"uruz-revers.png"
+        }
+    },
+    "wunjo":{
+        "wunjo_direct":{
+            "name": "Вуньо в прямом положении",
+            "image":"wunjo.png"
+        },
+        "wunjo_revers":{
+            "name": "Вуньо в перевёрнутом положении",
+            "image":"wunjo-revers.png"
+        }
+    }
+}}
