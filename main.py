@@ -1,20 +1,14 @@
-from dotenv import load_dotenv
+import asyncio
 import os
-import json
-import random
-import csv
-from datetime import datetime
-from pathlib import Path
-from telegram import Update, ReplyKeyboardMarkup
+from dotenv import load_dotenv
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder, 
     CommandHandler,
     MessageHandler,
-    filters, 
     ContextTypes,
+    filters, 
     )
-import aiohttp
-import asyncio
 
 from handlers.base import start, menu_command, error_handler, main_menu
 from handlers.runes import one_rune_mode, three_runes_mode, handle_message
@@ -26,7 +20,8 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 
 
-async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработка параметров меню выбранных пользователем"""
     text = update.message.text
 
     if text == "Одна руна":
@@ -41,46 +36,65 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await main_menu(update, context)
 
 
-if __name__ == '__main__':
-    def start_bot():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-            
-            # Обработчики команд
-            application.add_handler(CommandHandler("start", start))
-            application.add_handler(CommandHandler("menu", menu_command))
+def setup_handlers(application) -> None:
+    """Установка всех обработчиков для бота"""
+    # Обработчики команд
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("menu", menu_command))
 
-            application.add_handler(MessageHandler(
-                filters.TEXT & (
-                    filters.Regex("^Одна руна$") |
+    # Обработчики меню
+    menu_filters = filters.TEXT & (
+        filters.Regex("^Одна руна$") |
                     filters.Regex("^Три руны$") |
                     filters.Regex("^Как гадать$") |
                     filters.Regex("^Главное меню$")
-                ),
-                handle_menu
-            ))
-            application.add_handler(MessageHandler(
-                (filters.TEXT & filters.User(int(ADMIN_ID))) | 
-                (filters.FORWARDED & filters.User(int(ADMIN_ID))), 
-                handle_forwarded_message
-            ))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.User(int(ADMIN_ID)), handle_message))
+    )
+    application.add_handler(MessageHandler(menu_filters, handle_menu))
 
-            # Обработчики ошибок
-            application.add_error_handler(error_handler)
-            
-            application.run_polling()
-            
-        except KeyboardInterrupt:
-            print("Бот остановлен")
-        except Exception as e:
-            print(f"Ошибка: {e}")
-        finally:
-            loop.close()
+    # Обработчики админа
+    admin_filters = (
+        (filters.TEXT & filters.User(int(ADMIN_ID))) | 
+        (filters.FORWARDED & filters.User(int(ADMIN_ID)))
+    )
+    application.add_handler(MessageHandler(admin_filters, handle_forwarded_message))
 
-    start_bot()
+    # Обработчик сообщений обычных пользователей
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.User(int(ADMIN_ID)), handle_message)
+    )
+
+    # Обработчик ошибок
+    application.add_error_handler(error_handler)
 
 
+async def run_bot() -> None:
+    """Основная асинхронная функция для запуска бота"""
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    setup_handlers(application)
+    try:
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        print("Бот запущен и работает...")
+        while True:
+            await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
+
+
+def main() -> None:
+    """Основная точка запуска бота"""
+    try:
+        asyncio.run(run_bot())
+    except KeyboardInterrupt:
+        print("Бот остановлен")
+    except Exception as e:
+        print(f"Ошибка: {e}")
+    
+
+if __name__ == '__main__':
+    main()
