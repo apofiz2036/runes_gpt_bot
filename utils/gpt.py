@@ -1,17 +1,22 @@
 import os
 import aiohttp
 from pathlib import Path
+from typing import Dict, Union, List
+
 
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
 
-def load_prompt(prompt_type: str = 'one_rune'):
+
+def load_prompt(prompt_type: str = 'one_rune') -> str:
+    """Загружает промпт из файла по указанному типу."""
     file_name = f'prompt_{prompt_type}.txt'
-    with open(file_name, 'r', encoding='utf-8') as f:
-        return f.read()
+    with open(file_name, 'r', encoding='utf-8') as file:
+        return file.read()
     
 
-async def ask_gpt(user_question: str, rune_data: dict, prompt_type: str = 'one_rune'):
+async def ask_gpt(user_question: str, rune_data: dict, prompt_type: str = 'one_rune') -> str:
+    """Отправляет запрос к Yandex GPT API для интерпретации рун."""
     if prompt_type == 'one_rune':
         prompt = load_prompt('one_rune').format(
             question=user_question,
@@ -25,6 +30,7 @@ async def ask_gpt(user_question: str, rune_data: dict, prompt_type: str = 'one_r
             rune3=rune_data[2]['name'],
         )
 
+    # Подготовка данных для запроса к Yandex GPT API
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {
         "Content-Type": "application/json",
@@ -34,11 +40,17 @@ async def ask_gpt(user_question: str, rune_data: dict, prompt_type: str = 'one_r
     data = {
         "modelUri": f"gpt://{YANDEX_FOLDER_ID}/yandexgpt-lite",
         "messages": [
-            {"role": "system", "text": "Ты психолог, использующий скандинавские руны как ассоциативные карты. Даёшь рациональные интерпретации, основанные на символизме рун и современной психологии. Избегай мистики и предсказаний."},
+            {
+                "role": "system", 
+                "text": "Ты психолог, использующий скандинавские руны как ассоциативные карты. "
+                        "Даёшь рациональные интерпретации, основанные на символизме рун и "
+                        "современной психологии. Избегай мистики и предсказаний."
+            },
             {"role": "user", "text": prompt},
         ],
     }
     
+    # Отправка асинхронного запроса
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(url, headers=headers, json=data) as response:
@@ -46,4 +58,5 @@ async def ask_gpt(user_question: str, rune_data: dict, prompt_type: str = 'one_r
                 json_data = await response.json()
                 return json_data["result"]["alternatives"][0]["message"]["text"]
         except Exception as e:
-            return "Упс, произошла ошибка"
+            return "Произошла непредвиденная ошибка при обработке запроса"
+        

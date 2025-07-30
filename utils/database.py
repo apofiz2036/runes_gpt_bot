@@ -9,23 +9,28 @@ SUBSCRIBERS_FILE = "data/subscribers.csv"
 ADMIN_ID = os.getenv("ADMIN_ID")
 
 def save_subscriber(user_id: int):
+    """Сохраняет ID подписчика и временную метку"""
     file_exists = Path(SUBSCRIBERS_FILE).exists()
 
-    with open(SUBSCRIBERS_FILE, 'a', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
+    with open(SUBSCRIBERS_FILE, 'a', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+
         if not file_exists:
             writer.writerow(["user_id", "first_seen"])
-        writer.writerow([user_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")    
+        writer.writerow([user_id, timestamp])
 
 
 def get_subscribers():
+    """Получает уникальные ID из .csv файла, за исключением админа"""
     subscribers = []
 
     if not Path(SUBSCRIBERS_FILE).exists():
         return subscribers
 
-    with open(SUBSCRIBERS_FILE, 'r', encoding='utf8') as f:
-        reader = csv.reader(f)
+    with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as file:
+        reader = csv.reader(file)
         next(reader)
 
         unique_subscribers = set()
