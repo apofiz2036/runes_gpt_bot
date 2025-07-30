@@ -1,51 +1,70 @@
+import asyncio
 import os
-from telegram import Update
+from typing import Optional
+from telegram import Update, Message, PhotoSize, Video
 from telegram.ext import ContextTypes
 from utils.database import get_subscribers
-import asyncio
 
-ADMIN_ID = os.getenv("ADMIN_ID")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    is_admin_message = (
-        update.message.from_user.id == int(ADMIN_ID) or
-        (update.message.forward_from and update.message.forward_from.id == int(ADMIN_ID))
+async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Обрабатывает сообщения от администратора и рассылает их подписчикам.
+    Поддержиает тестовые сообщения, фото (с подписью и без), видео.
+    """
+    if not _is_admin_message(update):
+        return
+    
+    subscribers = get_subscribers()
+    message = update.message
+
+    for user_id in subscribers:
+        await _send_message_to_subscriber(context.bot, user_id, message)
+        await asyncio.sleep(0.3)
+
+
+def _is_admin_message(update: Update) -> bool:
+    """Проверяет пришло ли сообщение от админа."""
+    user = update.effective_user
+    forwarded_user = update.message.forward_from
+
+    return (user and user.id == ADMIN_ID) or (forwarded_user and forwarded_user.id == ADMIN_ID)
+
+
+async def _send_message_to_subscriber(bot, user_id: int, message: Message) -> None:
+    """Отправляет сообщение подписчику с обработкой различных типов контента."""
+    try:
+        if message.caption and message.photo:
+            await _send_photo_with_caption(bot, user_id, message)
+        elif message.text:
+            await bot.send_message(chat_id=user_id, text=message.text)
+        elif message.photo:
+            await _send_photo(bot, user_id, message.photo[-1])
+        elif message.video:
+            await _send_video(bot, user_id, message)
+    except Exception as e:
+        print(f"Ошибка при отправке пользователю {user_id}: {e}")
+
+
+async def _send_photo_with_caption(bot, user_id: int, message: Message) -> None:
+    """Отправляет фото с подписью."""
+    await bot.send_photo(
+        chat_id=user_id,
+        photo=message.photo[-1].file_id,
+        caption=message.caption
     )
 
-    subscribers = get_subscribers()
-    
-    for user_id in subscribers:
-        try:
-            # Если есть текст И фото
-            if update.message.caption and update.message.photo:
-                await context.bot.send_photo(
-                    chat_id=user_id,
-                    photo=update.message.photo[-1].file_id,
-                    caption=update.message.caption
-                )
-            # Если просто текст
-            elif update.message.text:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=update.message.text
-                )
-            # Если просто фото без текста
-            elif update.message.photo:
-                await context.bot.send_photo(
-                    chat_id=user_id,
-                    photo=update.message.photo[-1].file_id
-                )
-            # Если видео
-            elif update.message.video:
-                await context.bot.send_video(
-                    chat_id=user_id,
-                    video=update.message.video.file_id,
-                    caption=update.message.caption
-                )
-            else:
-                pass
-                
-            await asyncio.sleep(0.3)
-            
-        except Exception as e:
-            continue
+
+async def _send_photo(bot, user_id: int, photo: PhotoSize) -> None:
+    """Отправляет фото без подписи."""
+    await bot.send_photo(chat_id=user_id, photo=photo.file_id)
+
+
+async def _send_video(bot, user_id: int, message: Message) -> None:
+    """Отправляет видео с подписью (если есть)."""
+    await bot.send_video(
+        chat_id=user_id,
+        video=message.video.file_id,
+        caption=message.caption
+    )
+

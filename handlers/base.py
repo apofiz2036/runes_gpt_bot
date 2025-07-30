@@ -1,28 +1,38 @@
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ContextTypes
-from pathlib import Path
 import csv
 from datetime import datetime
+from pathlib import Path
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ContextTypes
+
 
 SUBSCRIBERS_FILE = "subscribers.csv"
+
+# Чтение описания бота из файла
 with open('bot_description.txt', 'r', encoding='utf-8') as file:
     BOT_DESCRIPTION = file.read()
 
 
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отображает главное меню с кнопками выбора действия."""    
     keyboard = [
         ["Одна руна", "Три руны"],
         ["Как гадать"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     context.user_data['mode'] = 'main_menu'
-    await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+
+    await update.message.reply_text(
+        "Выберите действие:",
+        reply_markup=reply_markup
+    )
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /start. Инициализирует бота для пользователя."""
     context.user_data.clear()
-
     chat_id = update.message.chat_id
+
     await context.bot.send_message(
         chat_id=chat_id,
         text=BOT_DESCRIPTION,
@@ -31,16 +41,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await main_menu(update, context)
 
 
-async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE)  -> None:
+    """Обработчик команды /menu. Возвращает пользователя в главное меню."""
     context.user_data.clear()
     await main_menu(update, context)
 
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик ошибок бота."""
     print(f"Ошибка {context.error}")
 
     if update and hasattr(update, 'message'):
         await update.message.reply_text(
             "Произошла ошибка. Возвращаю в главное меню.",
-            reply_markup=ReplyKeyboardMarkup([["/start"]], resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([["Главное меню"]], resize_keyboard=True)
         ) 

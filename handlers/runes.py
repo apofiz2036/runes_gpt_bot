@@ -1,31 +1,38 @@
+import os
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.runes import get_random_one_rune, get_random_three_runes, load_rune_data
 from utils.database import save_subscriber
 from utils.gpt import ask_gpt
 from handlers.base import main_menu
-import os
 
 
-async def one_rune_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ['Главное меню']
-    ]
+async def one_rune_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Активирует режим гадания на одной руне."""
+    keyboard = [['Главное меню']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    context.user_data['mode'] = 'one_rune'
-    context.user_data['prompt_type'] = 'one_rune'
-    await update.message.reply_text("Задайте ваш вопрос для гадания на одной руне:", reply_markup=reply_markup)
+
+    context.user_data.update({
+        'mode':'one_rune',
+        'prompt_type': 'one_rune'
+    })
+
+    await update.message.reply_text(
+        "Задайте ваш вопрос для гадания на одной руне:", 
+        reply_markup=reply_markup
+    )
 
 
-async def three_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ['Главное меню']
-    ]
+async def three_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Активирует режим гадания на трёх рунах."""
+    keyboard = [['Главное меню']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    context.user_data['mode'] = 'three_rune'
-    context.user_data['prompt_type'] = 'three_runes'
 
-    context.user_data['selected_runes'] = get_random_three_runes()
+    context.user_data.update({
+        'mode': 'three_rune',
+        'prompt_type': 'three_runes',
+        'selected_runes': get_random_three_runes()
+    })
     
     await update.message.reply_text(
         "Задайте ваш вопрос для гадания на трёх рунах",
@@ -33,51 +40,96 @@ async def three_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает пользовательские сообщения в зависимости от текущего режима."""
+    # Игнорируем нажатие кнопок в меню    
     if update.message.text in ["Одна руна", "Три руны", "Как гадать", "Главное меню"]:
         return
     
     current_mode = context.user_data.get('mode')
 
+    # Если режим не установлен возвращаемся в главное меню
     if current_mode not in ['one_rune', 'three_rune']:
         await main_menu(update, context)
         return
 
+    # Сохраняем подписчика при первом обращении
     if not context.user_data.get('is_subscribed'):
         user = update.message.from_user
         save_subscriber(user.id)
         context.user_data['is_subscribed'] = True
-    
+
     user_question = update.message.text
 
+    # Обработка режима одной руны
     if current_mode == 'one_rune':
-        rune_name, rune_image = get_random_one_rune()
-        with open(rune_image, 'rb') as photo:
-            await update.message.reply_photo(photo)
-        gpt_response = await ask_gpt(user_question, {'name': rune_name}, 'one_rune')
-    elif current_mode == 'three_rune':
-        runes = context.user_data['selected_runes']
-        rune_data = load_rune_data()
+        await _handle_one_rune_mode(update, user_question)
 
-        for rune in runes:
-            if rune['variant'] is None:
-                image = rune_data[rune['rune_key']]['image']
+    # Обработка режима трёх рун
+    elif current_mode == 'three_rune':
+        await _handle_three_runes_mode(update, context, user_question)
+
+    await main_menu(update, context)   
+
+
+async def _handle_one_rune_mode(update: Update, question: str) -> None:
+    """Обрабатывает запрос для режима одной руны."""
+    rune_name, rune_image = get_random_one_rune()
+
+    with open(rune_image, 'rb') as photo:
+        await update.message.reply_photo(photo)
+    
+    gpt_response = await ask_gpt(question, {'name': rune_name}, 'one_rune')
+    await update.message.reply_text(gpt_response)
+
+
+async def _handle_three_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, question: str) -> None:
+    """Обрабатывает запрос для режима трёх рун."""
+    runes = context.user_data['selected_runes']
+    rune_data = load_rune_data()
+
+    if not isinstance(rune_data, dict):
+        await update.message.reply_text("Ошибка: данные рун не загружены правильно")
+        return
+    
+    runes_for_prompt = []
+
+    # Отправляем изображения рун и собираем данные для GPT
+    for rune in runes:
+        try:
+            # Проверяем, есть ли руна в данных
+            if rune['rune_key'] not in rune_data:
+                await update.message.reply_text(f"Руна {rune['rune_key']} не найдена")
+                continue
+
+            # Определяем вариант руны
+            variant = rune['variant']
+            if variant is None:
+                image_info = rune_data[rune['rune_key']].get('image')
+                name_info = rune_data[rune['rune_key']].get('name')
             else:
-                image = rune_data[rune['rune_key']][rune['variant']]['image']
+                image_info = rune_data[rune['rune_key']].get(variant, {}).get('image')
+                name_info = rune_data[rune['rune_key']].get(variant, {}).get('name')
+
+            if not image_info or not name_info:
+                await update.message.reply_text(f"Данные для руны {rune['rune_key']} неполные")
+                continue
+
+            image_path = os.path.join('images', image_info)
             
-            image_path = os.path.join('images', image)
             with open(image_path, 'rb') as photo:
                 await update.message.reply_photo(photo)
 
-        runes_for_prompt = []
-        for rune in runes:
-            if rune['variant'] is None:
-                name = rune_data[rune['rune_key']]['name']
-            else:
-                name = rune_data[rune['rune_key']][rune['variant']]['name']
-            runes_for_prompt.append({'name': name})
+            runes_for_prompt.append({
+                'name': name_info
+            })
+            
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка при обработке руны: {str(e)}")
+            continue
 
-        gpt_response = await ask_gpt(user_question, runes_for_prompt, 'three_runes')
-
-    await update.message.reply_text(gpt_response)
-    await main_menu(update, context)
+    if runes_for_prompt:
+        gpt_response = await ask_gpt(question, runes_for_prompt, 'three_runes')
+        await update.message.reply_text(gpt_response)
+    else:
+        await update.message.reply_text("Не удалось получить данные рун для интерпретации")
