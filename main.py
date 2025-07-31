@@ -29,7 +29,7 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if text == "Три руны":
         await three_runes_mode(update, context)
     if text == "Как гадать":
-        with open('how_to_guess.txt', 'r', encoding='utf-8') as file:
+        with open('text/how_to_guess.txt', 'r', encoding='utf-8') as file:
             text = file.read()      
         await update.message.reply_text(text)
     if text == "Главное меню":
