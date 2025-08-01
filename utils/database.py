@@ -19,6 +19,18 @@ def save_subscriber(user_id: int):
     try:
         file_exists = Path(SUBSCRIBERS_FILE).exists()
 
+        # Проверяем существующих пользователей перед записью.
+        existing_users = set()
+        if file_exists:
+            with open(SUBSCRIBERS_FILE, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.reader(file)
+                next(reader, None)
+                for row in reader:
+                    if row:
+                        existing_users.add(int(row[0]))
+        if user_id in existing_users:
+            return
+
         with open(SUBSCRIBERS_FILE, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
 
@@ -30,6 +42,7 @@ def save_subscriber(user_id: int):
     except Exception as e:
         error_message = f"Ошибка в save_subscriber: {e}"
         logger.error(error_message)
+        send_error_to_admin(error_message)
 
 
 def get_subscribers():

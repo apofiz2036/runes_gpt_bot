@@ -1,3 +1,5 @@
 .env
 .csv
 /venv
+data/*.csv
+.log
