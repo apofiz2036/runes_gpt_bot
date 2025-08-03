@@ -76,3 +76,25 @@ def get_random_three_runes() -> List[Dict[str, Union[str, None]]]:
         logger.error(error_message)
 
 
+def get_random_four_runes() -> List[Dict[str, Union[str, None]]]:
+    """Выбирает 4 случайные руны для гадания"""
+    try:
+        rune_data = load_rune_data()
+        all_runes_keys = list(rune_data.keys())
+        selected_runes = random.sample(all_runes_keys, 4)
+
+        result = []
+        for rune_key in selected_runes:
+            variant = None
+            if rune_key not in SINGLE_RUNES:
+                variant = random.choice(list(rune_data[rune_key].keys()))
+            
+            result.append({
+                'rune_key': rune_key,
+                'variant': variant
+            })
+        
+        return result
+    except Exception as e:
+        error_message = f"Ошибка в get_random_four_runes: {e}"
+        logger.error(error_message)

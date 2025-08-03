@@ -11,7 +11,7 @@ from telegram.ext import (
     )
 
 from handlers.base import start, menu_command, error_handler, main_menu
-from handlers.runes import one_rune_mode, three_runes_mode, handle_message
+from handlers.runes import one_rune_mode, three_runes_mode, four_runes_mode, handle_message
 from handlers.admin import setup_admin_handlers
 from utils.database import init_db
 
@@ -28,13 +28,15 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if text == "Одна руна":
         await one_rune_mode(update, context)
-    if text == "Три руны":
+    elif text == "Три руны":
         await three_runes_mode(update, context)
-    if text == "Как гадать":
+    elif text == "Четыре руны":  # Добавлено
+        await four_runes_mode(update, context)
+    elif text == "Как гадать":
         with open('text/how_to_guess.txt', 'r', encoding='utf-8') as file:
             text = file.read()      
         await update.message.reply_text(text)
-    if text == "Главное меню":
+    elif text == "Главное меню":
         context.user_data.clear()
         await main_menu(update, context)
 
@@ -48,9 +50,10 @@ def setup_handlers(application) -> None:
     # Обработчики меню
     menu_filters = filters.TEXT & (
         filters.Regex("^Одна руна$") |
-                    filters.Regex("^Три руны$") |
-                    filters.Regex("^Как гадать$") |
-                    filters.Regex("^Главное меню$")
+        filters.Regex("^Три руны$") |
+        filters.Regex("^Четыре руны$") |
+        filters.Regex("^Как гадать$") |
+        filters.Regex("^Главное меню$")
     )
     application.add_handler(MessageHandler(menu_filters, handle_menu))
 
