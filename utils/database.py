@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 import csv
 import os
@@ -11,34 +12,70 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 load_dotenv()
-SUBSCRIBERS_FILE = "data/subscribers.csv"
 ADMIN_ID = os.getenv("ADMIN_ID")
+SQLITE_DB = "data/runes_bot.db"
+
+def init_db():
+    """
+    Создайт базу данных с двумя таблицами
+    - subscribers: хранит информацию о пользователях (user_id, first_seen, limits).
+    - divinations: хранит историю гаданий (user_id, date, divination_type)
+    """
+    try:
+        # Создаём папку если её ещё нет
+        Path ("data").mkdir(exist_ok=True)
+
+        # Подключаемся к базе данных
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
+
+        # Создаём таблицу subscribers
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscribers (
+                user_id INTEGER PRIMARY KEY,
+                first_seen TEXT NOT NULL,
+                limits INTEGER DEFAULT 50
+            )
+        """)
+
+        # Создаём таблицу divinations
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS divinations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                divination_type TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES subscribers (user_id)
+            )
+        """)
+
+        # Сохраняем таблицу
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        error_message = "Ошибка при создании базы данных"
+        logger.error(error_message)
+        
 
 def save_subscriber(user_id: int):
-    """Сохраняет ID подписчика и временную метку"""
+    """Сохраняет подписчика в SQLite (или пропускает, если он уже есть)."""
     try:
-        file_exists = Path(SUBSCRIBERS_FILE).exists()
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
 
-        # Проверяем существующих пользователей перед записью.
-        existing_users = set()
-        if file_exists:
-            with open(SUBSCRIBERS_FILE, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader, None)
-                for row in reader:
-                    if row:
-                        existing_users.add(int(row[0]))
-        if user_id in existing_users:
-            return
+        # Проверяем существование пользователя
+        cursor.execute("SELECT 1 FROM subscribers WHERE user_id = ?", (user_id,))
+        exist = cursor.fetchone()
 
-        with open(SUBSCRIBERS_FILE, 'a', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-
-            if not file_exists:
-                writer.writerow(["user_id", "first_seen"])
-
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")    
-            writer.writerow([user_id, timestamp])
+        if not exist:
+            # Добавляем нового пользователя
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute(
+                "INSERT INTO subscribers (user_id, first_seen) VALUES (?, ?)",
+                (user_id, timestamp)
+            )
+            conn.commit()
+        conn.close()
     except Exception as e:
         error_message = f"Ошибка в save_subscriber: {e}"
         logger.error(error_message)
@@ -46,28 +83,51 @@ def save_subscriber(user_id: int):
 
 
 def get_subscribers():
-    """Получает уникальные ID из .csv файла, за исключением админа"""
+    """Получает уникальные ID из SQLite, за исключением админа"""
     try:
-        subscribers = []
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
 
-        if not Path(SUBSCRIBERS_FILE).exists():
-            return subscribers
+        # Запрос для получения всех user_id, кроме админа
+        cursor.execute("""
+            SELECT user_id FROM subscribers
+            WHERE user_id != ?               
+        """, (int(ADMIN_ID),))
 
-        with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as file:
-            reader = csv.reader(file)
-            next(reader)
+        # Собираем уникальные ID в список
+        subscribers = [row[0] for row in cursor.fetchall()]
+        conn.close()
 
-            unique_subscribers = set()
-            for row in reader:
-                if not row:
-                    continue
-
-                user_id = int(row[0])
-                if user_id != int(ADMIN_ID):
-                    unique_subscribers.add(user_id)
-
-        return list(unique_subscribers)
+        return subscribers        
     except Exception as e:
         error_message = f"Ошибка в get_subscribers: {e}"
         logger.error(error_message)
+        return []
 
+
+def save_divination(user_id: int, divination_type: str):
+    """Сохраняет информацию о гадании в базу данных."""
+    try:
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
+
+        # Проверяем существование пользователя
+        cursor.execute("SELECT 1 FROM subscribers WHERE user_id = ?", (user_id,))
+        if not cursor.fetchone():
+            save_subscriber(user_id)
+        
+        # Добавляем запись о гадании
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "INSERT INTO divinations (user_id, date, divination_type) VALUES (?, ?, ?)",
+            (user_id, timestamp, divination_type)
+        )
+
+        conn.commit()
+    except Exception as e:
+        error_message = f"Ошибка при сохранении гадания: {e}"
+        logger.error(error_message)
+        send_error_to_admin(error_message)
+    finally:
+        conn.close()
+        

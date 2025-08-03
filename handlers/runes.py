@@ -3,7 +3,7 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.runes import get_random_one_rune, get_random_three_runes, load_rune_data
-from utils.database import save_subscriber
+from utils.database import save_subscriber, save_divination
 from utils.gpt import ask_gpt
 from handlers.base import main_menu
 from utils.logging import setup_logging, send_error_to_admin
@@ -96,12 +96,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def _handle_one_rune_mode(update: Update, question: str) -> None:
     """Обрабатывает запрос для режима одной руны."""
     try:
+        user_id = update.message.from_user.id
         rune_name, rune_image = get_random_one_rune()
 
         with open(rune_image, 'rb') as photo:
             await update.message.reply_photo(photo)
         
         gpt_response = await ask_gpt(question, {'name': rune_name}, 'one_rune')
+
+        save_divination(user_id, 'one_rune')
+
         await update.message.reply_text(gpt_response)
     except Exception as e:
         error_message = f"Ошибка в _handle_one_rune_mode: {e}"
@@ -110,6 +114,7 @@ async def _handle_one_rune_mode(update: Update, question: str) -> None:
 async def _handle_three_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, question: str) -> None:
     """Обрабатывает запрос для режима трёх рун."""
     try:
+        user_id = update.message.from_user.id
         runes = context.user_data['selected_runes']
         rune_data = load_rune_data()
 
@@ -155,6 +160,7 @@ async def _handle_three_runes_mode(update: Update, context: ContextTypes.DEFAULT
 
         if runes_for_prompt:
             gpt_response = await ask_gpt(question, runes_for_prompt, 'three_runes')
+            save_divination(user_id, 'three_runes')
             await update.message.reply_text(gpt_response)
         else:
             await update.message.reply_text("Не удалось получить данные рун для интерпретации")

@@ -13,8 +13,10 @@ from telegram.ext import (
 from handlers.base import start, menu_command, error_handler, main_menu
 from handlers.runes import one_rune_mode, three_runes_mode, handle_message
 from handlers.admin import handle_forwarded_message
+from utils.database import init_db
 
 load_dotenv()
+init_db()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")

@@ -1,5 +1,14 @@
+# Временные файлы Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+
 .env
 .csv
 /venv
 data/*.csv
-.log
+data/*.db
+
+*.log
+bot_errors.log
