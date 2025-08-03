@@ -12,7 +12,7 @@ from telegram.ext import (
 
 from handlers.base import start, menu_command, error_handler, main_menu
 from handlers.runes import one_rune_mode, three_runes_mode, handle_message
-from handlers.admin import handle_forwarded_message
+from handlers.admin import setup_admin_handlers
 from utils.database import init_db
 
 load_dotenv()
@@ -35,6 +35,7 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             text = file.read()      
         await update.message.reply_text(text)
     if text == "Главное меню":
+        context.user_data.clear()
         await main_menu(update, context)
 
 
@@ -53,12 +54,8 @@ def setup_handlers(application) -> None:
     )
     application.add_handler(MessageHandler(menu_filters, handle_menu))
 
-    # Обработчики админа
-    admin_filters = (
-        (filters.TEXT & filters.User(int(ADMIN_ID))) | 
-        (filters.FORWARDED & filters.User(int(ADMIN_ID)))
-    )
-    application.add_handler(MessageHandler(admin_filters, handle_forwarded_message))
+    #Обработчики администратора
+    setup_admin_handlers(application)
 
     # Обработчик сообщений обычных пользователей
     application.add_handler(
