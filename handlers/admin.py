@@ -81,14 +81,31 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
             logger.info(start_message)
             await bot.send_message(chat_id=ADMIN_ID, text=start_message)
 
+            blocked_users = 0
+            other_errors = 0
+
             for user_id in subscribers:
                 try:
                     await _send_message_to_subscriber(context.bot, user_id, message)
                     await asyncio.sleep(0.3)
                 except Exception as e:
-                    error_message = f"Ошибка при отправке пользователю {user_id}: {e}"
-                    logger.error(error_message)
-                    await send_error_to_admin(context.bot, error_message)
+                    if "bot was blocked by the user" in str(e):
+                        blocked_users += 1
+                        logger.debug(f"Пользователь {user_id} заблокировал бота")
+                    else:
+                        other_errors += 1
+                        error_message = f"Ошибка при отправке пользователю {user_id}: {e}"
+                        logger.error(error_message)
+
+            result_message = f"Рассылка завершена!\n\n"
+            result_message += f"Успешно отправлено: {total_count - blocked_users - other_errors}\n"
+
+            if blocked_users > 0:
+                result_message += f"Заблокировали бота: {blocked_users}\n"
+            if other_errors > 0:
+                result_message += f"Другие ошибки: {other_errors}\n"
+            
+            await bot.send_message(chat_id=ADMIN_ID, text=result_message)
             await admin_menu(update, context)
             del context.user_data["admin_state"]
             return
