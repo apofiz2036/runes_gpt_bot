@@ -23,6 +23,7 @@ def init_db():
     """
     try:
         # Создаём папку если её ещё нет
+        migrate_db() # ПОТОМ УДАЛИТЬ!!!!!!!!!!!!!!!!!!!
         Path ("data").mkdir(exist_ok=True)
 
         # Подключаемся к базе данных
@@ -33,6 +34,7 @@ def init_db():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS subscribers (
                 user_id INTEGER PRIMARY KEY,
+                user_name TEXT,
                 first_seen TEXT NOT NULL,
                 limits INTEGER DEFAULT 50
             )
@@ -55,9 +57,32 @@ def init_db():
     except Exception as e:
         error_message = "Ошибка при создании базы данных"
         logger.error(error_message)
+
+
+def migrate_db(): # ПОТОМ УДАЛИТЬ!!!!!!!!!!!!!!!!!!!!!!!!
+    """Добавляет user_name в существующую таблицу subscribers, если его нет."""
+    try:
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
+        
+        # Проверяем, есть ли столбец user_name
+        cursor.execute("PRAGMA table_info(subscribers)")
+        columns = [column[1] for column in cursor.fetchall()]  # Список всех столбцов
+        
+        if "user_name" not in columns:
+            # Добавляем столбец, если его нет
+            cursor.execute("ALTER TABLE subscribers ADD COLUMN user_name TEXT")
+            conn.commit()
+            logger.info("Добавлен столбец user_name в таблицу subscribers")
+            
+        conn.close()
+    except Exception as e:
+        error_message = f"Ошибка миграции: {e}"
+        logger.error(error_message)
+        send_error_to_admin(error_message)
         
 
-def save_subscriber(user_id: int):
+def save_subscriber(user_id: int, user_name: str = None):
     """Сохраняет подписчика в SQLite (или пропускает, если он уже есть)."""
     try:
         conn = sqlite3.connect(SQLITE_DB)
@@ -71,8 +96,8 @@ def save_subscriber(user_id: int):
             # Добавляем нового пользователя
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
-                "INSERT INTO subscribers (user_id, first_seen) VALUES (?, ?)",
-                (user_id, timestamp)
+                "INSERT INTO subscribers (user_id, first_seen, user_name) VALUES (?, ?, ?)",
+                (user_id, timestamp, user_name)
             )
             conn.commit()
         conn.close()
@@ -130,4 +155,33 @@ def save_divination(user_id: int, divination_type: str):
         send_error_to_admin(error_message)
     finally:
         conn.close()
+
+
+def update_user_name(user_id: int, new_name: str) -> None:
+    """Обновляет имя пользователя, если оно изменилось или было NULL."""
+    try:
+        if not new_name:  # Если имя пустое, пропускаем
+            return
+            
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
+        
+        # Проверяем текущее имя
+        cursor.execute("SELECT user_name FROM subscribers WHERE user_id = ?", (user_id,))
+        current_name = cursor.fetchone()
+        
+        # Если имени нет (NULL) или оно отличается — обновляем
+        if current_name is None or current_name[0] != new_name:
+            cursor.execute(
+                "UPDATE subscribers SET user_name = ? WHERE user_id = ?",
+                (new_name, user_id)
+            )
+            logger.info(f"Обновлено имя для user_id={user_id}: {new_name}")
+        
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Ошибка в update_user_name: {e}")
+    finally:
+        conn.close()
+
         
