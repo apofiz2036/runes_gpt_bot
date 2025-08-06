@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 load_dotenv()
-SQLITE_DB = os.path.join(os.path.dirname(__file__), "data/runes_bot.db")
+SQLITE_DB = "/opt/runes_gpt_bot/data/runes_bot.db"
 YANDEX_DISK_TOKEN = os.getenv("YANDEX_DISK_TOKEN")
 
 
