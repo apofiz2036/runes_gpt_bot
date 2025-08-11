@@ -26,8 +26,6 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отображает главное меню с кнопками выбора действия."""  
     try:  
         user = update.message.from_user
-        from utils.database import update_user_name
-        update_user_name(user.id, user.full_name)
         
         keyboard = [
             ["Одна руна", "Три руны", "Четыре руны"],

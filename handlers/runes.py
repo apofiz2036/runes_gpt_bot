@@ -96,7 +96,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Сохраняем подписчика при первом обращении
         if not context.user_data.get('is_subscribed'):
             user = update.message.from_user
-            save_subscriber(user.id, user.full_name)
+            save_subscriber(user.id)
             context.user_data['is_subscribed'] = True
 
         user_question = update.message.text

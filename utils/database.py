@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 import csv
+import secrets
 import os
 import logging
 from dotenv import load_dotenv
@@ -23,7 +24,7 @@ def init_db():
     """
     try:
         # Создаём папку если её ещё нет
-        migrate_db() # ПОТОМ УДАЛИТЬ!!!!!!!!!!!!!!!!!!!
+        migrate_db() 
         Path ("data").mkdir(exist_ok=True)
 
         # Подключаемся к базе данных
@@ -34,7 +35,6 @@ def init_db():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS subscribers (
                 user_id INTEGER PRIMARY KEY,
-                user_name TEXT,
                 first_seen TEXT NOT NULL,
                 limits INTEGER DEFAULT 50
             )
@@ -59,30 +59,68 @@ def init_db():
         logger.error(error_message)
 
 
-def migrate_db(): # ПОТОМ УДАЛИТЬ!!!!!!!!!!!!!!!!!!!!!!!!
-    """Добавляет user_name в существующую таблицу subscribers, если его нет."""
+def migrate_db(): 
+    """Добавляет столбец public_id в таблицу subscribers, если его нет."""
     try:
         conn = sqlite3.connect(SQLITE_DB)
         cursor = conn.cursor()
         
-        # Проверяем, есть ли столбец user_name
+        # Проверяем существование столбца
         cursor.execute("PRAGMA table_info(subscribers)")
-        columns = [column[1] for column in cursor.fetchall()]  # Список всех столбцов
-        
-        if "user_name" not in columns:
-            # Добавляем столбец, если его нет
-            cursor.execute("ALTER TABLE subscribers ADD COLUMN user_name TEXT")
+        columns = [column[1] for column in cursor.fetchall()]
+
+        if "public_id" not in columns:
+            # 1. Добавляем столбец БЕЗ UNIQUE сначала
+            cursor.execute("ALTER TABLE subscribers ADD COLUMN public_id TEXT")
             conn.commit()
-            logger.info("Добавлен столбец user_name в таблицу subscribers")
+            logger.info("Добавлен столбец public_id (без UNIQUE)")
+
+            # 2. Генерируем public_id для существующих пользователей
+            cursor.execute("SELECT user_id FROM subscribers WHERE public_id IS NULL")
+            users = cursor.fetchall()
             
-        conn.close()
+            for (user_id,) in users:
+                public_id = f"RUNES-{secrets.token_hex(3).upper()}"  # Например, RUNES-A1B2C3
+                cursor.execute(
+                    "UPDATE subscribers SET public_id = ? WHERE user_id = ?",
+                    (public_id, user_id)
+                )
+            
+            conn.commit()
+            logger.info(f"Сгенерированы public_id для {len(users)} пользователей")
+
+            # 3. Добавляем ограничение UNIQUE через новую таблицу
+            cursor.execute("""
+                CREATE TABLE subscribers_new (
+                    user_id INTEGER PRIMARY KEY,
+                    first_seen TEXT NOT NULL,
+                    limits INTEGER DEFAULT 50,
+                    public_id TEXT UNIQUE
+                )
+            """)
+            
+            # Копируем данные из старой таблицы в новую
+            cursor.execute("""
+                INSERT INTO subscribers_new 
+                SELECT user_id, first_seen, limits, public_id 
+                FROM subscribers
+            """)
+            
+            # Удаляем старую таблицу и переименовываем новую
+            cursor.execute("DROP TABLE subscribers")
+            cursor.execute("ALTER TABLE subscribers_new RENAME TO subscribers")
+            conn.commit()
+            logger.info("Добавлено ограничение UNIQUE для public_id")
+        
     except Exception as e:
-        error_message = f"Ошибка миграции: {e}"
+        error_message = f"Ошибка в migrate_db: {e}"
         logger.error(error_message)
         send_error_to_admin(error_message)
+    finally:
+        conn.close()
         
 
-def save_subscriber(user_id: int, user_name: str = None):
+def save_subscriber(user_id: int):
     """Сохраняет подписчика в SQLite (или пропускает, если он уже есть)."""
     try:
         conn = sqlite3.connect(SQLITE_DB)
@@ -95,9 +133,10 @@ def save_subscriber(user_id: int, user_name: str = None):
         if not exist:
             # Добавляем нового пользователя
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            public_id = f"RUNES-{secrets.token_hex(3).upper()}"
             cursor.execute(
-                "INSERT INTO subscribers (user_id, first_seen, user_name) VALUES (?, ?, ?)",
-                (user_id, timestamp, user_name)
+                "INSERT INTO subscribers (user_id, first_seen, public_id) VALUES (?, ?, ?)",
+                (user_id, timestamp, public_id)
             )
             conn.commit()
         conn.close()
@@ -157,31 +196,42 @@ def save_divination(user_id: int, divination_type: str):
         conn.close()
 
 
-def update_user_name(user_id: int, new_name: str) -> None:
-    """Обновляет имя пользователя, если оно изменилось или было NULL."""
+def top_up_limits(public_id: str, amount: int) -> tuple[bool, int]:
+    """
+    Пополняет лимиты пользователя по public_id.
+    Возвращает (success, user_id), где:
+    - success: True если операция успешна
+    - user_id: ID пользователя или None если не найден
+    """
     try:
-        if not new_name:  # Если имя пустое, пропускаем
-            return
-            
         conn = sqlite3.connect(SQLITE_DB)
         cursor = conn.cursor()
+
+        # Получаем user_id перед обновлением
+        cursor.execute(
+            "SELECT user_id FROM subscribers WHERE LOWER(public_id) = LOWER(?)",
+            (public_id.strip(),)
+        )
+        user = cursor.fetchone()
         
-        # Проверяем текущее имя
-        cursor.execute("SELECT user_name FROM subscribers WHERE user_id = ?", (user_id,))
-        current_name = cursor.fetchone()
+        if not user:
+            return (False, None)
         
-        # Если имени нет (NULL) или оно отличается — обновляем
-        if current_name is None or current_name[0] != new_name:
-            cursor.execute(
-                "UPDATE subscribers SET user_name = ? WHERE user_id = ?",
-                (new_name, user_id)
-            )
-            logger.info(f"Обновлено имя для user_id={user_id}: {new_name}")
+        user_id = user[0]
+
+        public_id = public_id.strip()
+        logger.info(f"Ищу public_id: '{public_id}'")
+
+        # Обновляем лимиты
+        cursor.execute(
+            "UPDATE subscribers SET limits = limits + ? WHERE LOWER(public_id) = LOWER(?)",
+            (amount, public_id.strip())
+        )
         
         conn.commit()
+        return (True, user_id)
     except Exception as e:
-        logger.error(f"Ошибка в update_user_name: {e}")
+        logger.error(f"Ошибка в top_up_limits: {e}")
+        return (False, None)
     finally:
         conn.close()
-
-        

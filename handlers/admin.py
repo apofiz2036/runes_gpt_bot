@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 from telegram import Update, Message, PhotoSize, Video, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
-from utils.database import get_subscribers
+from utils.database import get_subscribers, top_up_limits
 from utils.logging import setup_logging, send_error_to_admin
 
 # Инициализация логгера
@@ -15,6 +15,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 # Состояния для администратора
 WAITING_FOR_BROADCAST = 1
+WAITING_FOR_TOP_UP = 2
 
 def get_admin_keyboard():
     keyboard = [
@@ -57,7 +58,11 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         await bot.send_message(chat_id=ADMIN_ID, text=message)
 
     elif text == "Пополнить лимиты":
-        await bot.send_message(chat_id=ADMIN_ID, text="В разработке")
+        await update.message.reply_text(
+            "Введите данные в формате 'RUNES-ABC123 500'",
+            reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Главное меню")]], resize_keyboard=True)
+        )
+        context.user_data["admin_state"] = WAITING_FOR_TOP_UP
 
     elif text == "Главное меню":
         await admin_menu(update, context)
@@ -66,12 +71,16 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Обрабатывает сообщения от администратора и рассылает их подписчикам.
-    Поддержиает тестовые сообщения, фото (с подписью и без), видео.
+    Обрабатывает сообщения от администратора
     """
     try:
-        if (update.effective_user.id == ADMIN_ID and 
-            context.user_data.get("admin_state") == WAITING_FOR_BROADCAST):
+        if update.effective_user.id != ADMIN_ID:
+            return
+        
+        admin_state = context.user_data.get("admin_state")
+
+        # Обработка состояния рассылки
+        if admin_state == WAITING_FOR_BROADCAST:
             subscribers = get_subscribers()
             message = update.message
             bot = context.bot
@@ -99,7 +108,6 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
 
             result_message = f"Рассылка завершена!\n\n"
             result_message += f"Успешно отправлено: {total_count - blocked_users - other_errors}\n"
-
             if blocked_users > 0:
                 result_message += f"Заблокировали бота: {blocked_users}\n"
             if other_errors > 0:
@@ -109,7 +117,49 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
             await admin_menu(update, context)
             del context.user_data["admin_state"]
             return
-        if not _is_admin_message(update):
+        
+        # Оработчик для пополнения лимитов
+        if admin_state == WAITING_FOR_TOP_UP:
+            message_text = update.message.text.strip()
+            parts = message_text.split()
+
+            if len(parts) != 2:
+                await update.message.reply_text(
+                    "Неверный формат. Введите данные как:\npublic_id 500"
+                )
+                return
+            
+            public_id = parts[0]
+            amount_str = parts[1]
+            
+            try:
+                amount = int(amount_str)
+            except ValueError:
+                await update.message.reply_text("Сумма должна быть числом")
+                return
+            
+            success, user_id = top_up_limits(public_id, amount)
+
+            if success:
+                await update.message.reply_text(
+                    f"Лимиты пользователя {public_id} успешно пополнены на {amount}",
+                    reply_markup=get_admin_keyboard()
+                )
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=f"Ваши лимиты изменены на {amount}. Текущий баланс можно проверить в меню."
+                    )
+                except Exception as e:
+                    logger.error(f"Не удалось отправить уведомление пользователю {user_id}: {e}")
+            else:
+                await update.message.reply_text(
+                    f"Пользователь {public_id} не найден",
+                    reply_markup=get_admin_keyboard()
+                )
+
+            # Выходим из состояния
+            del context.user_data["admin_state"]
             return
     except Exception as e:
         error_message = f"Критическая ошибка в handle_forwarded_message: {e}"
@@ -174,3 +224,4 @@ def setup_admin_handlers(application):
     application.add_handler(CommandHandler("admin", admin_menu, filters=filters.User(ADMIN_ID)))
     application.add_handler(MessageHandler(filters.Text(["Рассылка", "Подписчики", "Пополнить лимиты", "Главное меню"]) & filters.User(ADMIN_ID), handle_admin_buttons))
     application.add_handler(MessageHandler(filters.ALL & filters.User(ADMIN_ID), handle_forwarded_message))
+
