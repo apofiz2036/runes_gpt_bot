@@ -14,6 +14,9 @@ from handlers.base import start, menu_command, error_handler, main_menu
 from handlers.runes import one_rune_mode, three_runes_mode, four_runes_mode, handle_message
 from handlers.admin import setup_admin_handlers
 from utils.database import init_db, get_user_info_by_user_id
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from utils.scheduler import reset_daily_limits
+from pytz import timezone
 
 load_dotenv()
 init_db()
@@ -86,6 +89,9 @@ async def run_bot() -> None:
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     setup_handlers(application)
     try:
+        scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
+        scheduler.add_job(reset_daily_limits, 'cron', hour=0, minute=0)
+        scheduler.start()
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
