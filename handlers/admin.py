@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 from telegram import Update, Message, PhotoSize, Video, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
-from utils.database import get_subscribers, top_up_limits
+from utils.database import get_subscribers, top_up_limits, get_user_limits
 from utils.logging import setup_logging, send_error_to_admin
 
 # Инициализация логгера
@@ -16,12 +16,12 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 # Состояния для администратора
 WAITING_FOR_BROADCAST = 1
 WAITING_FOR_TOP_UP = 2
+WAITING_FOR_LIMITS_CHECK = 3
 
 def get_admin_keyboard():
     keyboard = [
-        [KeyboardButton("Рассылка")],
-        [KeyboardButton("Подписчики")],
-        [KeyboardButton("Пополнить лимиты")]
+        [KeyboardButton("Рассылка"), KeyboardButton("Подписчики")],
+        [KeyboardButton("Пополнить лимиты"), KeyboardButton("Узнать лимиты пользователя")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -64,6 +64,13 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         context.user_data["admin_state"] = WAITING_FOR_TOP_UP
 
+    elif text == "Узнать лимиты пользователя":
+        await update.message.reply_text(
+            "Введите public_id пользователя в формате 'RUNES-ABC123'",
+            reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Главное меню")]], resize_keyboard=True)
+        )
+        context.user_data["admin_state"] = WAITING_FOR_LIMITS_CHECK
+
     elif text == "Главное меню":
         await admin_menu(update, context)
         if "admin_state" in context.user_data:
@@ -75,6 +82,9 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
     """
     try:
         if update.effective_user.id != ADMIN_ID:
+            return
+        admin_state = context.user_data.get("admin_state")
+        if not admin_state:
             return
         
         admin_state = context.user_data.get("admin_state")
@@ -161,6 +171,23 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
             # Выходим из состояния
             del context.user_data["admin_state"]
             return
+        
+        # Обработчик инфо лимитов пользователя
+        if admin_state == WAITING_FOR_LIMITS_CHECK:
+            public_id = update.message.text.strip()
+            success, limits, user_id = get_user_limits(public_id)
+            if success:
+                await update.message.reply_text(
+                    f"Телеграм id: {user_id}, public_id: {public_id}, Лимитов: {limits}"
+                )
+        else:
+            await update.message.reply_text(
+                    f"Пользователь {public_id} не найден.",
+                    reply_markup=get_admin_keyboard()
+                )
+        del context.user_data['admin_state']
+        return
+    
     except Exception as e:
         error_message = f"Критическая ошибка в handle_forwarded_message: {e}"
         logger.critical(error_message)
@@ -222,6 +249,6 @@ async def _send_video(bot, user_id: int, message: Message) -> None:
 def setup_admin_handlers(application):
     """Настройка обработчиков для администратора"""
     application.add_handler(CommandHandler("admin", admin_menu, filters=filters.User(ADMIN_ID)))
-    application.add_handler(MessageHandler(filters.Text(["Рассылка", "Подписчики", "Пополнить лимиты", "Главное меню"]) & filters.User(ADMIN_ID), handle_admin_buttons))
+    application.add_handler(MessageHandler(filters.Text(["Рассылка", "Подписчики", "Пополнить лимиты", "Узнать лимиты пользователя", "Главное меню"]) & filters.User(ADMIN_ID), handle_admin_buttons))
     application.add_handler(MessageHandler(filters.ALL & filters.User(ADMIN_ID), handle_forwarded_message))
 

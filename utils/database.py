@@ -235,3 +235,59 @@ def top_up_limits(public_id: str, amount: int) -> tuple[bool, int]:
         return (False, None)
     finally:
         conn.close()
+
+
+def get_user_limits(public_id: str) -> tuple[bool, int, int]:
+    """
+    Возвращает (success, limits, user_id) для пользователя по public_id.
+    - success: True если найден
+    - limits: количество лимитов
+    - user_id: Telegram ID пользователя
+    """
+    try:
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT limits, user_id FROM subscribers WHERE LOWER(public_id) = LOWER(?)",
+            (public_id.strip(),)
+        )
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return (True, row[0], row[1])
+        else:
+            return (False, 0, None)
+    except Exception as e:
+        logger.error(f"Ошибка в get_user_limits: {e}")
+        return (False, 0, None)
+
+
+def get_user_info_by_user_id(user_id: int) -> tuple[bool, str, int]:
+    """
+    Возвращает (success, public_id, limits) для пользователя по его Telegram ID.
+    - success: True если найден
+    - public_id: его публичный ID
+    - limits: количество лимитов
+    """
+    try:
+        conn = sqlite3.connect(SQLITE_DB)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT public_id, limits FROM subscribers WHERE user_id = ?",
+            (user_id, )
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return (True, row[0], row[1])
+        else:
+            return (False, "", 0)
+    except Exception as e:
+        logger.error(f"get_user_info_by_user_id: {e}")
+        return (False, "", 0)
+    

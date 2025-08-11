@@ -13,7 +13,7 @@ from telegram.ext import (
 from handlers.base import start, menu_command, error_handler, main_menu
 from handlers.runes import one_rune_mode, three_runes_mode, four_runes_mode, handle_message
 from handlers.admin import setup_admin_handlers
-from utils.database import init_db
+from utils.database import init_db, get_user_info_by_user_id
 
 load_dotenv()
 init_db()
@@ -30,12 +30,23 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await one_rune_mode(update, context)
     elif text == "Три руны":
         await three_runes_mode(update, context)
-    elif text == "Четыре руны":  # Добавлено
+    elif text == "Четыре руны":
         await four_runes_mode(update, context)
     elif text == "Как гадать":
         with open('text/how_to_guess.txt', 'r', encoding='utf-8') as file:
             text = file.read()      
         await update.message.reply_text(text)
+    elif text == "Мои лимиты":
+        success, public_id, limits = get_user_info_by_user_id(update.effective_user.id)
+        if success:
+            await update.message.reply_text(
+                f"Ваш public_id: {public_id}\n"
+                f"Ваши лимиты: {limits}"
+            )
+        else:
+            await update.message.reply_text(
+            "Не удалось найти ваши данные. Попробуйте снова или напишите в поддержку."
+        )
     elif text == "Главное меню":
         context.user_data.clear()
         await main_menu(update, context)
@@ -53,6 +64,7 @@ def setup_handlers(application) -> None:
         filters.Regex("^Три руны$") |
         filters.Regex("^Четыре руны$") |
         filters.Regex("^Как гадать$") |
+        filters.Regex("^Мои лимиты$") |
         filters.Regex("^Главное меню$")
     )
     application.add_handler(MessageHandler(menu_filters, handle_menu))
