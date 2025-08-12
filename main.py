@@ -16,10 +16,14 @@ from handlers.admin import setup_admin_handlers
 from utils.database import init_db, get_user_info_by_user_id
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from utils.scheduler import reset_daily_limits
+from data.export_to_cloud import export_to_csv, upload_to_yandex
 from pytz import timezone
 
 load_dotenv()
 init_db()
+
+
+# БЛЯЯЯЯЯЯЯЯЯЯЯЯ ЛОООООООООООООООООООООООООООООООООООООООООООООООООГИИИИИИИИИИИИИИИИИИИИИИИИИИИИ!
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
@@ -84,6 +88,14 @@ def setup_handlers(application) -> None:
     application.add_error_handler(error_handler)
 
 
+def export_and_upload():
+    try:
+        subs_path, div_path = export_to_csv()
+        upload_to_yandex(subs_path, div_path)
+    except Exception as e:
+        print(f"Ошибка {e}")
+
+
 async def run_bot() -> None:
     """Основная асинхронная функция для запуска бота"""
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -91,6 +103,7 @@ async def run_bot() -> None:
     try:
         scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
         scheduler.add_job(reset_daily_limits, 'cron', hour=0, minute=0)
+        scheduler.add_job(export_and_upload, 'cron', hour='*/3', minute=0)
         scheduler.start()
         await application.initialize()
         await application.start()
