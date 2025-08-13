@@ -1,9 +1,7 @@
-import csv
 import logging
-from datetime import datetime
-from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
+
 from utils.logging import setup_logging, send_error_to_admin
 
 
@@ -11,6 +9,7 @@ from utils.logging import setup_logging, send_error_to_admin
 logger = logging.getLogger(__name__)
 setup_logging()
 
+BOT_DESCRIPTION = "Описание бота временно недоступно."
 
 # Чтение описания бота из файла
 try:
@@ -24,8 +23,6 @@ except Exception as e:
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отображает главное меню с кнопками выбора действия."""  
     try:  
-        user = update.message.from_user
-        
         keyboard = [
             ["Одна руна", "Три руны", "Четыре руны"],
             ["Как гадать", "Мои лимиты"]
@@ -73,11 +70,15 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE)  -> N
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик ошибок бота."""
-    print(f"Ошибка {context.error}")
+    try:
+        logger.error(f"Ошибка: {context.error}")
 
-    if update and hasattr(update, 'message'):
-        await update.message.reply_text(
-            "Произошла ошибка. Возвращаю в главное меню.",
-            reply_markup=ReplyKeyboardMarkup([["Главное меню"]], resize_keyboard=True)
-        ) 
+        if update and hasattr(update, 'message'):
+            await update.message.reply_text(
+                "Произошла ошибка. Возвращаю в главное меню.",
+                reply_markup=ReplyKeyboardMarkup([["Главное меню"]], resize_keyboard=True)
+            )
+    except Exception as e:
+        logger.error(f"Ошибка внутри error_handler: {e}") 
+        await send_error_to_admin(context.bot, f"Ошибка в error_handler: {e}")
 

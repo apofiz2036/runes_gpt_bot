@@ -1,100 +1,117 @@
 import json
-import random
 import os
-import logging
-from typing import Dict, List, Tuple, Union
-from utils.logging import setup_logging, send_error_to_admin
+import random
+import asyncio
+from typing import List, Dict, Optional, Tuple, Union
 
-# Инициализация логгера
-logger = logging.getLogger(__name__)
-setup_logging()
+RUNES_FILE = os.path.join("runes.json")
 
-# Руны, которые имеют только одно значение
-SINGLE_RUNES = ["dagaz", "eihwaz", "gebo", "hagalaz", "inguz", "isa", "jera", "sowilo"]
 
-def load_rune_data() -> Dict:
-    """Загружает данные о рунах из JSON-файла.
-    
-    Возвращает: Словарь с данными о рунах (только раздел 'one_rune')"""
+async def _load_full_json() -> Dict:
+    """Служебная: грузит исходный JSON целиком в отдельном потоке."""
     try:
-        with open('runes.json', 'r', encoding='utf-8') as file:
-            data = json.load(file)
-            return data['one_rune']
-    except Exception as e:
-        error_message = f"Ошибка в load_rune_data: {e}"
-        logger.error(error_message)
-    
-
-def get_random_one_rune() -> Tuple[str, str]:
-    """Выбирает случайную руну и возвращает её описание и путь к изображению."""
-    try:
-        rune_data = load_rune_data()
-        all_runes = list(rune_data.keys())
-        random_rune = random.choice(all_runes)
-
-        # Обработка рун с вариантами и без
-        if random_rune in SINGLE_RUNES:
-            rune_info = rune_data[random_rune]
-        else:
-            variant = random.choice(list(rune_data[random_rune].keys()))
-            rune_info = rune_data[random_rune][variant]
-
-        image_path = os.path.join('images', rune_info['image'])
-        return rune_info['name'], image_path
-    except Exception as e:
-        error_message = f"Ошибка в get_random_one_rune: {e}"
-        logger.error(error_message)
+        return await asyncio.to_thread(_read_json_file, RUNES_FILE)
+    except Exception:
+        return {}
 
 
-def get_random_three_runes() -> List[Dict[str, Union[str, None]]]:
-    """Выбирает три случайные руны для гадания
-    Возвращает: Список словарей с информацией о рунах:
-        [{
-            'rune_key': ключ руны,
-            'variant': вариант руны (None для рун без вариантов)
-        }, ...]
+def _read_json_file(path: str) -> Dict:
+    """Блокирующее чтение JSON (используется внутри to_thread)."""
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+async def load_rune_data() -> Dict[str, Dict]:
     """
-    try:
-        rune_data = load_rune_data()
-        all_runes_keys = list(rune_data.keys())
-        selected_runes = random.sample(all_runes_keys, 3)
+    Возвращает словарь с данными рун (ключи — названия рун в нижнем регистре).
 
-        result = []
-        for rune_key in selected_runes:
-            variant = None
-            if rune_key not in SINGLE_RUNES:
-                variant = random.choice(list(rune_data[rune_key].keys()))
+    Формат:
+    {
+        "<rune_key>": {
+            "<rune_key>_direct": {"name": "...", "image": "..."},
+            "<rune_key>_revers": {"name": "...", "image": "..."},
+            # или если без вариантов:
+            "name": "...",
+            "image": "..."
+        },
+        ...
+    }
+    """
+    data = await _load_full_json()
+    return data.get("one_rune", {})
 
-            result.append({
-                'rune_key': rune_key,
-                'variant': variant
-            })
-        
-        return result
-    except Exception as e:
-        error_message = f"Ошибка в get_random_three_runes: {e}"
-        logger.error(error_message)
+def _pick_variant_key(rune_key: str, node: Dict) -> Optional[str]:
+    """
+    Для конкретной руны решает, какой вариант взять:
+    - если есть *_direct / *_revers → случайно выбираем один
+    - если вариантов нет → None
+    """
+    direct_key = f"{rune_key}_direct"
+    revers_key = f"{rune_key}_revers"
+
+    has_direct = direct_key in node
+    has_revers = revers_key in node
+
+    if not has_direct and not has_revers:
+        return None
+    
+    candidates = []
+    if has_direct:
+        candidates.append(direct_key)
+    if has_revers:
+        candidates.append(revers_key)
+
+    return random.choice(candidates)
 
 
-def get_random_four_runes() -> List[Dict[str, Union[str, None]]]:
-    """Выбирает 4 случайные руны для гадания"""
-    try:
-        rune_data = load_rune_data()
-        all_runes_keys = list(rune_data.keys())
-        selected_runes = random.sample(all_runes_keys, 4)
+async def get_random_runes(count: int) -> List[Dict[str, Optional[str]]]:
+    """
+    Универсальный выбор N рун.
+    Возвращает список словарей:
+        {"rune_key": <str>, "variant": <None|str>}
+    """
+    rune_data = await load_rune_data()
+    rune_keys = list(rune_data.keys())
+    if not rune_keys:
+        return []
+    
+    result: List[Dict[str, Optional[str]]] = []
+    for _ in range(count):
+        rune_key = random.choice(rune_keys)
+        node = rune_data.get(rune_key, {})
+        variant_key = _pick_variant_key(rune_key, node)
+        result.append({"rune_key": rune_key, "variant": variant_key})
+    
+    return result
 
-        result = []
-        for rune_key in selected_runes:
-            variant = None
-            if rune_key not in SINGLE_RUNES:
-                variant = random.choice(list(rune_data[rune_key].keys()))
-            
-            result.append({
-                'rune_key': rune_key,
-                'variant': variant
-            })
-        
-        return result
-    except Exception as e:
-        error_message = f"Ошибка в get_random_four_runes: {e}"
-        logger.error(error_message)
+
+async def get_random_one_rune() -> Tuple[str, str]:
+    """
+    Выбирает одну руну и возвращает (имя, путь_к_картинке).
+    """
+    rune_data = await load_rune_data()
+    if not rune_data:
+        return "", ""
+    
+    rune_key = random.choice(list(rune_data.keys()))
+    node = rune_data.get(rune_key, {})
+    variant_key = _pick_variant_key(rune_key, node)
+
+    if variant_key is None:
+        name = node.get("name", "")
+        image = node.get("image", "")
+    else:
+        variant_node = node.get(variant_key, {})
+        name = variant_node.get("name", "")
+        image = variant_node.get("image", "")
+    
+    image_path = os.path.join("images", image) if image else ""
+    return name, image_path
+
+# Обёртки для обратной совместимости
+async def get_random_three_runes() -> List[Dict[str, Optional[str]]]:
+    return await get_random_runes(3)
+
+async def get_random_four_runes() -> List[Dict[str, Optional[str]]]:
+    return await get_random_runes(4)
+
