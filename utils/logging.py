@@ -2,6 +2,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from telegram import Bot
+from config import ADMIN_ID
 
 
 def setup_logging():
@@ -27,8 +28,7 @@ def setup_logging():
 
 
 async def send_error_to_admin(bot: Bot, error_message: str):
-    admin_id = int(os.getenv("ADMIN_ID"))
     await bot.send_message(
-        chat_id=admin_id,
+        chat_id=ADMIN_ID,
         text=f"Ошибка: {error_message}"
     )

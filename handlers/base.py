@@ -11,7 +11,6 @@ from utils.logging import setup_logging, send_error_to_admin
 logger = logging.getLogger(__name__)
 setup_logging()
 
-SUBSCRIBERS_FILE = "subscribers.csv"
 
 # Чтение описания бота из файла
 try:

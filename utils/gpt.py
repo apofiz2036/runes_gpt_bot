@@ -4,16 +4,12 @@ import logging
 from pathlib import Path
 from typing import Dict, Union, List
 from utils.logging import setup_logging, send_error_to_admin
+from config import YANDEX_API_KEY, YANDEX_FOLDER_ID
 
 
 # Инициализация логгера
 logger = logging.getLogger(__name__)
 setup_logging()
-
-
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
-YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
-
 
 def load_prompt(prompt_type: str = 'one_rune') -> str:
     """Загружает промпт из файла по указанному типу."""

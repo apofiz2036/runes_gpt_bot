@@ -1,55 +1,51 @@
 import sqlite3
 import csv
-import os
 import logging
-import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from yadisk import YaDisk
 
-sys.path.append(str(Path(__file__).parent.parent))
 from utils.logging import setup_logging
+from config import SQLITE_DB, YANDEX_DISK_TOKEN
+
+load_dotenv()
 
 # Инициализация логгера
 logger = logging.getLogger(__name__)
 setup_logging()
 
-load_dotenv()
-SQLITE_DB = "/opt/runes_gpt_bot/data/runes_bot.db"
-YANDEX_DISK_TOKEN = os.getenv("YANDEX_DISK_TOKEN")
-
 
 def export_to_csv():
+    """Загружает данные из SQLite в .csv файл"""
     try:
         # Указываем полный путь для CSV файлов
-        csv_dir = os.path.join(os.path.dirname(__file__), "data")
-        os.makedirs(csv_dir, exist_ok=True)
+        db_path = Path(SQLITE_DB)
+        csv_dir = db_path.parent
+        csv_dir.mkdir(parents=True, exist_ok=True)
+
+        subscribers_path = csv_dir / "subscribers.csv"
+        divinations_path = csv_dir / "divinations.csv"
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+       
+            # Экспорт subscribers
+            cursor.execute("SELECT * FROM subscribers")
+            with open(subscribers_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow([i[0] for i in cursor.description])
+                writer.writerows(cursor.fetchall())
         
-        conn = sqlite3.connect(SQLITE_DB)
-        cursor = conn.cursor()
+            # Экспорт divinations
+            cursor.execute("SELECT * FROM divinations")
+            with open(divinations_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow([i[0] for i in cursor.description])
+                writer.writerows(cursor.fetchall())
 
-        subscribers_path = os.path.join(csv_dir, "subscribers.csv")
-        divinations_path = os.path.join(csv_dir, "divinations.csv")
-
-        # Экспорт subscribers
-        cursor.execute("SELECT * FROM subscribers")
-        with open(subscribers_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([i[0] for i in cursor.description])
-            writer.writerows(cursor.fetchall())
-        
-        # Экспорт divinations
-        cursor.execute("SELECT * FROM divinations")
-        with open(divinations_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([i[0] for i in cursor.description])
-            writer.writerows(cursor.fetchall())
-
-        conn.close()
-        return subscribers_path, divinations_path
+        return str(subscribers_path), str(divinations_path)
     except Exception as e:
-        error_message = f"Ошибка в export_to_csv {e}"
-        logger.error(error_message)
+        logger.exception(f"Ошибка в export_to_csv: {e}")
 
 def upload_to_yandex(subscribers_path, divinations_path):
     """Загружает CSV на Яндекс.Диск"""
@@ -62,11 +58,10 @@ def upload_to_yandex(subscribers_path, divinations_path):
         
         y.upload(subscribers_path, f"{remote_dir}/subscribers.csv", overwrite=True)
         y.upload(divinations_path, f"{remote_dir}/divinations.csv", overwrite=True)
-        print("Файлы загружены в Яндекс.Диск!")
-    
+
+        logger.info("Файлы успешно загружены в Яндекс.Диск.")
     except Exception as e:
-        error_message = f"Ошибка в upload_to_yandex {e}"
-        logger.error(error_message)
+        logger.exception(f"Ошибка в upload_to_yandex: {e}")
         raise
 
 
@@ -75,5 +70,4 @@ if __name__ == '__main__':
         subs_path, div_path = export_to_csv()
         upload_to_yandex(subs_path, div_path)
     except Exception as e:
-        logger.error(f"Critical error: {e}")
-        sys.exit(1)
+        logger.exception(f"Critical error при выгрузке на облако: {e}")

@@ -2,7 +2,7 @@ import sqlite3
 import logging
 from datetime import datetime
 from pytz import timezone
-from utils.database import SQLITE_DB
+from config import SQLITE_DB
 
 logger = logging.getLogger(__name__)
 

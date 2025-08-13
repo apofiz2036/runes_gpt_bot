@@ -96,7 +96,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Сохраняем подписчика при первом обращении
         if not context.user_data.get('is_subscribed'):
             user = update.message.from_user
-            save_subscriber(user.id)
+            await save_subscriber(user.id)
             context.user_data['is_subscribed'] = True
 
         user_question = update.message.text
@@ -131,7 +131,7 @@ async def _handle_one_rune_mode(update: Update, question: str) -> None:
         
         gpt_response = await ask_gpt(question, {'name': rune_name}, 'one_rune')
 
-        save_divination(user_id, 'one_rune')
+        await save_divination(user_id, 'one_rune')
 
         await update.message.reply_text(gpt_response)
     except Exception as e:
@@ -188,7 +188,7 @@ async def _handle_three_runes_mode(update: Update, context: ContextTypes.DEFAULT
 
         if runes_for_prompt:
             gpt_response = await ask_gpt(question, runes_for_prompt, 'three_runes')
-            save_divination(user_id, 'three_runes')
+            await save_divination(user_id, 'three_runes')
             await update.message.reply_text(gpt_response)
         else:
             await update.message.reply_text("Не удалось получить данные рун для интерпретации")
@@ -242,7 +242,7 @@ async def _handle_four_runes_mode(update: Update, context: ContextTypes.DEFAULT_
         
         if runes_for_prompt:
             gpt_response = await ask_gpt(question, runes_for_prompt, 'four_runes')
-            save_divination(user_id, 'four_runes')
+            await save_divination(user_id, 'four_runes')
             await update.message.reply_text(gpt_response)
         else:
             await update.message.reply_text("Не удалось получить данные рун для интерпретации")

@@ -1,29 +1,30 @@
 import asyncio
-import os
 import logging
-from typing import Optional
-from telegram import Update, Message, PhotoSize, Video, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, Message, PhotoSize, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+
 from utils.database import get_subscribers, top_up_limits, get_user_limits
 from utils.logging import setup_logging, send_error_to_admin
+from config import ADMIN_ID
 
 # Инициализация логгера
 logger = logging.getLogger(__name__)
 setup_logging()
-
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 # Состояния для администратора
 WAITING_FOR_BROADCAST = 1
 WAITING_FOR_TOP_UP = 2
 WAITING_FOR_LIMITS_CHECK = 3
 
+
 def get_admin_keyboard():
+    """Возвращает клавиатуру администратора."""
     keyboard = [
         [KeyboardButton("Рассылка"), KeyboardButton("Подписчики")],
         [KeyboardButton("Пополнить лимиты"), KeyboardButton("Узнать лимиты пользователя")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
 
 async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /admin, показывает меню администратора"""
@@ -42,7 +43,6 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     
     text = update.message.text
-    bot = context.bot
 
     if text == "Рассылка":
         await update.message.reply_text(
@@ -52,10 +52,9 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data["admin_state"] = WAITING_FOR_BROADCAST
     
     elif text == "Подписчики":
-        subscribers = get_subscribers()
+        subscribers = await get_subscribers()
         total_count = len(subscribers)
-        message = f"На бот подписано {total_count} подписчиков"
-        await bot.send_message(chat_id=ADMIN_ID, text=message)
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"На бот подписано {total_count} подписчиков")
 
     elif text == "Пополнить лимиты":
         await update.message.reply_text(
@@ -73,32 +72,27 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
 
     elif text == "Главное меню":
         await admin_menu(update, context)
-        if "admin_state" in context.user_data:
-            del context.user_data["admin_state"] 
+        context.user_data.pop("admin_state", None)
+
 
 async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Обрабатывает сообщения от администратора
-    """
+    """Обрабатывает сообщения от администратора"""
     try:
         if update.effective_user.id != ADMIN_ID:
             return
+        
         admin_state = context.user_data.get("admin_state")
         if not admin_state:
             return
-        
-        admin_state = context.user_data.get("admin_state")
 
-        # Обработка состояния рассылки
+        # Состояние: рассылки
         if admin_state == WAITING_FOR_BROADCAST:
-            subscribers = get_subscribers()
+            subscribers = await get_subscribers()
             message = update.message
-            bot = context.bot
 
             total_count = len(subscribers)
-            start_message = f"Начата рассылка для {total_count} подписчиков"
-            logger.info(start_message)
-            await bot.send_message(chat_id=ADMIN_ID, text=start_message)
+            logger.info(f"Начата рассылка для {total_count} подписчиков")
+            await context.bot.send_message(chat_id=ADMIN_ID, text=f"Начата рассылка для {total_count} подписчиков")
 
             blocked_users = 0
             other_errors = 0
@@ -116,16 +110,18 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
                         error_message = f"Ошибка при отправке пользователю {user_id}: {e}"
                         logger.error(error_message)
 
-            result_message = f"Рассылка завершена!\n\n"
-            result_message += f"Успешно отправлено: {total_count - blocked_users - other_errors}\n"
-            if blocked_users > 0:
+            result_message = (
+                f"Рассылка завершена!\n\n"
+                f"Успешно отправлено: {total_count - blocked_users - other_errors}\n"
+            )
+            if blocked_users:
                 result_message += f"Заблокировали бота: {blocked_users}\n"
-            if other_errors > 0:
+            if other_errors:
                 result_message += f"Другие ошибки: {other_errors}\n"
             
-            await bot.send_message(chat_id=ADMIN_ID, text=result_message)
+            await context.bot.send_message(chat_id=ADMIN_ID, text=result_message)
             await admin_menu(update, context)
-            del context.user_data["admin_state"]
+            context.user_data.pop("admin_state", None)
             return
         
         # Оработчик для пополнения лимитов
@@ -148,7 +144,7 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
                 await update.message.reply_text("Сумма должна быть числом")
                 return
             
-            success, user_id = top_up_limits(public_id, amount)
+            success, user_id = await top_up_limits(public_id, amount)
 
             if success:
                 await update.message.reply_text(
@@ -168,42 +164,29 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
                     reply_markup=get_admin_keyboard()
                 )
 
-            # Выходим из состояния
-            del context.user_data["admin_state"]
+            context.user_data.pop("admin_state", None)
             return
         
         # Обработчик инфо лимитов пользователя
         if admin_state == WAITING_FOR_LIMITS_CHECK:
             public_id = update.message.text.strip()
-            success, limits, user_id = get_user_limits(public_id)
+            success, limits, user_id = await get_user_limits(public_id)
             if success:
                 await update.message.reply_text(
                     f"Телеграм id: {user_id}, public_id: {public_id}, Лимитов: {limits}"
                 )
-        else:
-            await update.message.reply_text(
-                    f"Пользователь {public_id} не найден.",
-                    reply_markup=get_admin_keyboard()
-                )
-        del context.user_data['admin_state']
-        return
+            else:
+                await update.message.reply_text(
+                        f"Пользователь {public_id} не найден.",
+                        reply_markup=get_admin_keyboard()
+                    )
+            context.user_data.pop("admin_state", None)
+            return
     
     except Exception as e:
         error_message = f"Критическая ошибка в handle_forwarded_message: {e}"
-        logger.critical(error_message)
+        logger.error(error_message)
         await send_error_to_admin(context.bot, error_message)
-
-
-def _is_admin_message(update: Update) -> bool:
-    """Проверяет пришло ли сообщение от админа."""
-    try:
-        user = update.effective_user
-        forwarded_user = update.message.forward_from
-        return (user and user.id == ADMIN_ID) or (forwarded_user and forwarded_user.id == ADMIN_ID)
-    except Exception as e:
-        logger.error(f"Ошибка в _is_admin_message: {e}")
-        return False
-    
 
 
 async def _send_message_to_subscriber(bot, user_id: int, message: Message) -> None:
@@ -249,6 +232,12 @@ async def _send_video(bot, user_id: int, message: Message) -> None:
 def setup_admin_handlers(application):
     """Настройка обработчиков для администратора"""
     application.add_handler(CommandHandler("admin", admin_menu, filters=filters.User(ADMIN_ID)))
-    application.add_handler(MessageHandler(filters.Text(["Рассылка", "Подписчики", "Пополнить лимиты", "Узнать лимиты пользователя", "Главное меню"]) & filters.User(ADMIN_ID), handle_admin_buttons))
+    application.add_handler(
+        MessageHandler(
+            filters.Text(["Рассылка", "Подписчики", "Пополнить лимиты", "Узнать лимиты пользователя", "Главное меню"]) & 
+            filters.User(ADMIN_ID),
+            handle_admin_buttons
+        )
+    )
     application.add_handler(MessageHandler(filters.ALL & filters.User(ADMIN_ID), handle_forwarded_message))
 
