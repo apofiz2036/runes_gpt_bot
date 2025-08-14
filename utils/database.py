@@ -21,7 +21,7 @@ async def init_db():
     """
     try:
         # Создаём папку если её ещё нет
-        await migrate_db() 
+        
         Path ("data").mkdir(exist_ok=True)
 
         # Подключаемся к базе данных
@@ -51,6 +51,8 @@ async def init_db():
         # Сохраняем таблицу
         await conn.commit()
         await conn.close()
+
+        await migrate_db() 
     except Exception as e:
         error_message = "Ошибка при создании базы данных"
         logger.error(error_message)
