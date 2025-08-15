@@ -289,4 +289,37 @@ async def get_user_info_by_user_id(user_id: int) -> tuple[bool, str, int]:
     except Exception as e:
         logger.error(f"get_user_info_by_user_id: {e}")
         return (False, "", 0)
-    
+
+
+async def deduct_limits(user_id: int, amount: int) -> bool:
+    """
+    Списывает amount лимитов у пользователя.
+    Возвращает True, если успешно (лимитов хватило), иначе False.
+    """
+    try:
+        conn = await aiosqlite.connect(SQLITE_DB)
+        cursor = await conn.cursor()
+
+        # Проверяем текущее количество
+        await cursor.execute("SELECT limits FROM subscribers WHERE user_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            await conn.close()
+            return False
+        
+        current_limits = row[0]
+        if current_limits < amount:
+            await conn.close()
+            return False
+        
+        # Списываем
+        await cursor.execute(
+            "UPDATE subscribers SET limits = limits - ? WHERE user_id = ?",
+            (amount, user_id)
+        )
+        await conn.commit()
+        await conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка в deduct_limits: {e}")
+        return False

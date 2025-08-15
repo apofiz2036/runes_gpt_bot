@@ -9,10 +9,11 @@ from utils.runes import (
     get_random_four_runes,
     load_rune_data
 )
-from utils.database import save_subscriber, save_divination
+from utils.database import save_subscriber, save_divination, deduct_limits, get_user_info_by_user_id
 from utils.gpt import ask_gpt
 from handlers.base import main_menu
 from utils.logging import setup_logging, send_error_to_admin
+from utils.prices import load_prices
 
 
 # Инициализация логгера
@@ -109,6 +110,25 @@ async def _handle_one_rune_mode(update: Update, question: str) -> None:
     """Обрабатывает запрос для режима одной руны."""
     try:
         user_id = update.message.from_user.id
+        prices = load_prices()
+        price = prices.get("one_rune", 10)
+        
+        # Проверка лимитов
+        success, _, limits = await get_user_info_by_user_id(user_id)
+        if not success or limits < price:
+            await update.message.reply_text(
+                "У вас недостаточно лимитов. "
+                "Дождитесь пополнения или напишите админу @Apofiz2036"
+            )
+            return
+        
+        # Списываем
+        if not await deduct_limits(user_id, price):
+            await update.message.reply_text(
+                "Не удалось списать лимиты. Попробуйте позже."
+            )
+            return  
+
         rune_name, rune_image = await get_random_one_rune()
 
         with open(rune_image, 'rb') as photo:
@@ -129,6 +149,25 @@ async def _handle_multiple_runes_mode(update: Update, context: ContextTypes.DEFA
     """Обрабатывает запросы для режима с несколькими рунами (3, 4 и т.д.)."""
     try:
         user_id = update.message.from_user.id
+        prices = load_prices()
+        price = prices.get(prompt_type, 10)
+
+         # Проверка лимитов
+        success, _, limits = await get_user_info_by_user_id(user_id)
+        if not success or limits < price:
+            await update.message.reply_text(
+                "У вас недостаточно лимитов. "
+                "Дождитесь пополнения или напишите админу @Apofiz2036"
+            )
+            return
+
+        # Списываем
+        if not await deduct_limits(user_id, price):
+            await update.message.reply_text(
+                "Не удалось списать лимиты. Попробуйте позже."
+            )
+            return
+
         runes = context.user_data['selected_runes']
         rune_data = await load_rune_data()
 
