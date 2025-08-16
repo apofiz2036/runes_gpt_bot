@@ -24,7 +24,8 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отображает главное меню с кнопками выбора действия."""  
     try:  
         keyboard = [
-            ["Одна руна", "Три руны", "Четыре руны"],
+            ["Одна руна", "Три руны"],
+            ["Четыре руны", "Судьба"],
             ["Как гадать", "Мои лимиты"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

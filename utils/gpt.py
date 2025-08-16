@@ -45,6 +45,16 @@ async def ask_gpt(user_question: str, rune_data: dict, prompt_type: str = 'one_r
                 rune3=rune_data[2]['name'],
                 rune4=rune_data[3]['name']
             )
+        elif prompt_type == 'fate':
+            prompt = load_prompt('fate').format(
+                question=user_question,
+                rune1=rune_data[0]['name'],
+                rune2=rune_data[1]['name'],
+                rune3=rune_data[2]['name'],
+                rune4=rune_data[3]['name'],
+                rune5=rune_data[4]['name'],
+                rune6=rune_data[5]['name'],
+            )
 
         # Подготовка данных для запроса к Yandex GPT API
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"

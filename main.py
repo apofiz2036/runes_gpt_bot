@@ -9,10 +9,16 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     filters,
-    )
+)
 
 from handlers.base import start, menu_command, error_handler, main_menu
-from handlers.runes import one_rune_mode, three_runes_mode, four_runes_mode, handle_message
+from handlers.runes import (
+    one_rune_mode, 
+    three_runes_mode, 
+    four_runes_mode, 
+    handle_message,
+    fate_mode
+)
 from handlers.admin import setup_admin_handlers
 from utils.database import init_db, get_user_info_by_user_id
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -42,6 +48,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await three_runes_mode(update, context)
         elif text == "Четыре руны":
             await four_runes_mode(update, context)
+        elif text == "Судьба":
+            await fate_mode(update, context)
         elif text == "Как гадать":
             with open('text/how_to_guess.txt', 'r', encoding='utf-8') as file:
                 text = file.read()      
@@ -78,6 +86,7 @@ def setup_handlers(application) -> None:
             filters.Regex("^Одна руна$") |
             filters.Regex("^Три руны$") |
             filters.Regex("^Четыре руны$") |
+            filters.Regex("^Судьба$") |
             filters.Regex("^Как гадать$") |
             filters.Regex("^Мои лимиты$") |
             filters.Regex("^Главное меню$")

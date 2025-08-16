@@ -75,9 +75,10 @@ async def get_random_runes(count: int) -> List[Dict[str, Optional[str]]]:
     if not rune_keys:
         return []
     
+    chosen_keys = random.sample(rune_keys, count)
+    
     result: List[Dict[str, Optional[str]]] = []
-    for _ in range(count):
-        rune_key = random.choice(rune_keys)
+    for rune_key in chosen_keys:
         node = rune_data.get(rune_key, {})
         variant_key = _pick_variant_key(rune_key, node)
         result.append({"rune_key": rune_key, "variant": variant_key})
@@ -115,3 +116,5 @@ async def get_random_three_runes() -> List[Dict[str, Optional[str]]]:
 async def get_random_four_runes() -> List[Dict[str, Optional[str]]]:
     return await get_random_runes(4)
 
+async def get_random_five_runes() -> List[Dict[str, Optional[str]]]:
+    return await get_random_runes(6)

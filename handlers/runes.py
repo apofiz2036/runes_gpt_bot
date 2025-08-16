@@ -7,6 +7,7 @@ from utils.runes import (
     get_random_one_rune,
     get_random_three_runes,
     get_random_four_runes,
+    get_random_five_runes,
     load_rune_data
 )
 from utils.database import save_subscriber, save_divination, deduct_limits, get_user_info_by_user_id
@@ -25,6 +26,14 @@ PROMPT_TYPE_NAMES = {
     'one_rune': 'одной руне',
     'three_runes': 'трёх рунах',
     'four_runes': 'четырёх рунах',
+    'fate': "раскладе судьба"
+}
+
+SEND_IMAGES = {
+    "one_rune": True,
+    "three_runes": True,
+    "four_runes": True,
+    "fate": False,
 }
 
 
@@ -68,17 +77,22 @@ async def four_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await _enter_rune_mode(update, context, 'four_rune', 'four_runes', get_random_four_runes)
 
 
+async def fate_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Активирует режим гадания на четырёх рунах."""
+    await _enter_rune_mode(update, context, 'fate', 'fate', get_random_five_runes)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обрабатывает пользовательские сообщения в зависимости от текущего режима."""
     try:
         # Игнорируем нажатие кнопок в меню    
-        if update.message.text in ["Одна руна", "Три руны", "Четыре руны", "Как гадать", "Главное меню"]:
+        if update.message.text in ["Одна руна", "Три руны", "Четыре руны", "Как гадать", "Судьба", "Главное меню"]:
             return
         
         current_mode = context.user_data.get('mode')
 
         # Если режим не установлен возвращаемся в главное меню
-        if current_mode not in ['one_rune', 'three_rune', 'four_rune']:
+        if current_mode not in ['one_rune', 'three_rune', 'four_rune', 'fate']:
             await main_menu(update, context)
             return
 
@@ -94,6 +108,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'one_rune': lambda: _handle_one_rune_mode(update, user_question),
             'three_rune': lambda: _handle_multiple_runes_mode(update, context, user_question, 'three_runes'),
             'four_rune': lambda: _handle_multiple_runes_mode(update, context, user_question, 'four_runes'),
+            'fate': lambda: _handle_multiple_runes_mode(update, context, user_question, 'fate'),
         }
 
         if current_mode in handlers:
@@ -196,8 +211,10 @@ async def _handle_multiple_runes_mode(update: Update, context: ContextTypes.DEFA
                     continue
                 
                 image_path = os.path.join('images', image_info)
-                with open(image_path, 'rb') as photo:
-                    await update.message.reply_photo(photo)
+
+                if SEND_IMAGES.get(prompt_type, True):
+                    with open(image_path, 'rb') as photo:
+                        await update.message.reply_photo(photo)
                 
                 runes_for_prompt.append({'name': name_info})
             except Exception as e:
