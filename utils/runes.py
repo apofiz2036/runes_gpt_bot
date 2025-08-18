@@ -116,5 +116,10 @@ async def get_random_three_runes() -> List[Dict[str, Optional[str]]]:
 async def get_random_four_runes() -> List[Dict[str, Optional[str]]]:
     return await get_random_runes(4)
 
-async def get_random_five_runes() -> List[Dict[str, Optional[str]]]:
+async def get_random_six_runes() -> List[Dict[str, Optional[str]]]:
     return await get_random_runes(6)
+
+
+async def get_random_twelve_runes() -> List[Dict[str, Optional[str]]]:
+    return await get_random_runes(12)
+

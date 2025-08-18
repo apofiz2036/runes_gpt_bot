@@ -7,7 +7,8 @@ from utils.runes import (
     get_random_one_rune,
     get_random_three_runes,
     get_random_four_runes,
-    get_random_five_runes,
+    get_random_six_runes,
+    get_random_twelve_runes,
     load_rune_data
 )
 from utils.database import save_subscriber, save_divination, deduct_limits, get_user_info_by_user_id
@@ -26,14 +27,15 @@ PROMPT_TYPE_NAMES = {
     'one_rune': 'одной руне',
     'three_runes': 'трёх рунах',
     'four_runes': 'четырёх рунах',
-    'fate': "раскладе судьба"
+    'fate': "раскладе судьба",
+    'field': "Вспаханное поле"
 }
 
 SEND_IMAGES = {
-    "one_rune": True,
     "three_runes": True,
     "four_runes": True,
     "fate": False,
+    "field": False
 }
 
 
@@ -79,20 +81,24 @@ async def four_runes_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def fate_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Активирует режим гадания на четырёх рунах."""
-    await _enter_rune_mode(update, context, 'fate', 'fate', get_random_five_runes)
+    await _enter_rune_mode(update, context, 'fate', 'fate', get_random_six_runes)
 
+
+async def field_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Активирует режим гадания вспаханное поле"""
+    await _enter_rune_mode(update, context, 'field', 'field', get_random_twelve_runes)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обрабатывает пользовательские сообщения в зависимости от текущего режима."""
     try:
         # Игнорируем нажатие кнопок в меню    
-        if update.message.text in ["Одна руна", "Три руны", "Четыре руны", "Как гадать", "Судьба", "Главное меню"]:
+        if update.message.text in ["Одна руна", "Три руны", "Четыре руны", "Судьба", "Вспаханное поле", "Как гадать",  "Главное меню"]:
             return
         
         current_mode = context.user_data.get('mode')
 
         # Если режим не установлен возвращаемся в главное меню
-        if current_mode not in ['one_rune', 'three_rune', 'four_rune', 'fate']:
+        if current_mode not in ['one_rune', 'three_rune', 'four_rune', 'fate', 'field']:
             await main_menu(update, context)
             return
 
@@ -109,6 +115,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'three_rune': lambda: _handle_multiple_runes_mode(update, context, user_question, 'three_runes'),
             'four_rune': lambda: _handle_multiple_runes_mode(update, context, user_question, 'four_runes'),
             'fate': lambda: _handle_multiple_runes_mode(update, context, user_question, 'fate'),
+            'field': lambda: _handle_multiple_runes_mode(update, context, user_question, 'field'),
         }
 
         if current_mode in handlers:

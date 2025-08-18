@@ -2,5 +2,6 @@
     "one_rune": 10,
     "three_runes": 30,
     "four_runes": 40,
-    "fate": 50
+    "fate": 50,
+    "field": 100
 }

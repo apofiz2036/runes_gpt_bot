@@ -17,7 +17,8 @@ from handlers.runes import (
     three_runes_mode, 
     four_runes_mode, 
     handle_message,
-    fate_mode
+    fate_mode,
+    field_mode
 )
 from handlers.admin import setup_admin_handlers
 from utils.database import init_db, get_user_info_by_user_id
@@ -50,6 +51,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await four_runes_mode(update, context)
         elif text == "Судьба":
             await fate_mode(update, context)
+        elif text == "Вспаханное поле":
+            await field_mode(update, context)
         elif text == "Как гадать":
             with open('text/how_to_guess.txt', 'r', encoding='utf-8') as file:
                 text = file.read()      
@@ -87,6 +90,7 @@ def setup_handlers(application) -> None:
             filters.Regex("^Три руны$") |
             filters.Regex("^Четыре руны$") |
             filters.Regex("^Судьба$") |
+            filters.Regex("^Вспаханное поле$") |
             filters.Regex("^Как гадать$") |
             filters.Regex("^Мои лимиты$") |
             filters.Regex("^Главное меню$")
