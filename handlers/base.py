@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes
 
 from utils.logging import setup_logging, send_error_to_admin
 from utils.database import save_subscriber
+from utils.prices import load_prices
 
 
 # Инициализация логгера
@@ -23,11 +24,11 @@ except Exception as e:
 
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отображает главное меню с кнопками выбора действия."""  
-    try:  
+    try:
         keyboard = [
-            ["Одна руна", "Три руны"],
-            ["Четыре руны", "Судьба"],
-            ["Вспаханное поле"],
+            [f"Одна руна", f"Три руны"],
+            [f"Четыре руны", f"Судьба"],
+            [f"Вспаханное поле"],
             ["Как гадать", "Мои лимиты"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
