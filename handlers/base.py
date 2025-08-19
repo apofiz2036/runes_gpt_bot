@@ -3,6 +3,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from utils.logging import setup_logging, send_error_to_admin
+from utils.database import save_subscriber
 
 
 # Инициализация логгера
@@ -53,6 +54,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             text=BOT_DESCRIPTION,
             parse_mode="Markdown",
         )
+
+        # Сохраняем подписчика при первом обращении
+        if not context.user_data.get('is_subscribed'):
+            user = update.message.from_user
+            await save_subscriber(user.id)
+            context.user_data['is_subscribed'] = True
+            
         await main_menu(update, context)
     except Exception as e:
         error_message = f"Произошла ошибка в обработчике start: {e}"

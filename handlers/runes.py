@@ -11,7 +11,7 @@ from utils.runes import (
     get_random_twelve_runes,
     load_rune_data
 )
-from utils.database import save_subscriber, save_divination, deduct_limits, get_user_info_by_user_id
+from utils.database import save_divination, deduct_limits, get_user_info_by_user_id
 from utils.gpt import ask_gpt
 from handlers.base import main_menu
 from utils.logging import setup_logging, send_error_to_admin
@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 
-PROMPT_TYPE_NAMES = {
-    'one_rune': 'одной руне',
-    'three_runes': 'трёх рунах',
-    'four_runes': 'четырёх рунах',
-    'fate': "раскладе судьба",
-    'field': "Вспаханное поле"
+DESCRIPTION_OF_TYPE= {
+    'one_rune': 'Задайте вопрос для быстрого совета или ответа на вопрос.',
+    'three_runes': 'Задайте вопрос для разбора какой то ситуации или сферы жизни.',
+    'four_runes': 'Задайте вопрос для оценки выбора и возможных последствий.',
+    'fate': "Задайте вопрос для определения пути развития: опасности и радости на пути. ",
+    'field': "Задайте вопрос для прогноза на срок (от недели и более)"
 }
 
 SEND_IMAGES = {
@@ -53,9 +53,9 @@ async def  _enter_rune_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         if rune_selector:
             context.user_data['selected_runes'] = await rune_selector()
         
-        readable_name = PROMPT_TYPE_NAMES.get(prompt_type, prompt_type)
+        readable_description = DESCRIPTION_OF_TYPE.get(prompt_type, prompt_type)
         await update.message.reply_text(
-            f"Задайте ваш вопрос для гадания на {readable_name}:",
+            readable_description,
             reply_markup=reply_markup
         )
     except Exception as e:
@@ -101,12 +101,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if current_mode not in ['one_rune', 'three_rune', 'four_rune', 'fate', 'field']:
             await main_menu(update, context)
             return
-
-        # Сохраняем подписчика при первом обращении
-        if not context.user_data.get('is_subscribed'):
-            user = update.message.from_user
-            await save_subscriber(user.id)
-            context.user_data['is_subscribed'] = True
 
         user_question = update.message.text
 
