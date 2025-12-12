@@ -17,3 +17,7 @@ SQLITE_DB = os.getenv("SQLITE_DB", "data/runes_bot.db")
 
 # Лимиты
 DEFAULT_LIMITS = int(os.getenv("DEFAULT_LIMITS", 50))
+
+# ЮКасса
+YOOKASSA_SHOP_ID = os.getenv("YOOKASSA_SHOP_ID")
+YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY")

@@ -25,6 +25,7 @@ from utils.database import init_db, get_user_info_by_user_id
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from utils.scheduler import reset_daily_limits
 from data.export_to_cloud import export_to_csv, upload_to_yandex
+from utils.payment import payment_message, handle_payment_input
 from utils.logging import setup_logging, send_error_to_admin
 from config import TELEGRAM_BOT_TOKEN, ADMIN_ID
 
@@ -68,6 +69,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 await update.message.reply_text(
                 "Не удалось найти ваши данные. Попробуйте снова или напишите в поддержку."
             )
+        elif text == "Пополнить лимиты":
+            await payment_message(update, context)
         elif text == "Главное меню":
             context.user_data.clear()
             await main_menu(update, context)
@@ -93,19 +96,28 @@ def setup_handlers(application) -> None:
             filters.Regex("^Вспаханное поле$") |
             filters.Regex("^Как гадать$") |
             filters.Regex("^Мои лимиты$") |
+            filters.Regex("^Пополнить лимиты$") |
             filters.Regex("^Главное меню$")
         )
         application.add_handler(MessageHandler(menu_filters, handle_menu))
 
-        #Обработчики администратора
+        #  Обработчики администратора
         setup_admin_handlers(application)
 
-        # Обработчик сообщений обычных пользователей
+        #  Обработчик сообщений об оплате
+        application.add_handler(
+            MessageHandler(
+                filters.TEXT & ~filters.User(int(ADMIN_ID)) & ~menu_filters,
+                handle_payment_input
+            )
+        )
+
+        #  Обработчик сообщений обычных пользователей
         application.add_handler(
             MessageHandler(filters.TEXT & ~filters.User(int(ADMIN_ID)), handle_message)
         )
 
-        # Обработчик ошибок
+        #  Обработчик ошибок
         application.add_error_handler(error_handler)
     except Exception as e:
         error_message = f"Ошибка в setup_handlers: {e}"

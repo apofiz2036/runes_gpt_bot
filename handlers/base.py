@@ -29,6 +29,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             [f"Одна руна", f"Три руны"],
             [f"Четыре руны", f"Судьба"],
             [f"Вспаханное поле"],
+            ["Пополнить лимиты"],
             ["Как гадать", "Мои лимиты"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
